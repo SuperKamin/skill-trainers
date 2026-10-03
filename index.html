@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skill Trainers</title>
+<meta name="description" content="Quick skill trainers. Starting with reaction time.">
+<meta name="theme-color" content="#12131f">
+<meta name="color-scheme" content="dark">
+<!-- Installable on iPhone: Share → Add to Home Screen opens it full screen, like an app. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trainers">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Home -->
+<main id="home" class="page" hidden>
+  <div class="topline">
+    <span class="label">Skill trainers</span>
+    <div id="account"></div>
+  </div>
+  <h1 class="title">Train<br><span>sharp.</span></h1>
+  <ul class="trainers" id="trainer-list"></ul>
+  <div class="gentle" id="gentle"></div>
+</main>
+
+<!-- Play -->
+<div id="play" hidden>
+  <div class="play-top">
+    <a class="ghost" href="#/" aria-label="Back to home">‹ Home</a>
+    <span class="mid label"><span id="play-name"></span> · <span id="play-status">0 taps</span></span>
+    <a class="ghost" id="play-history" href="#/">History</a>
+  </div>
+  <div id="play-stage"></div>
+</div>
+
+<!-- History -->
+<main id="history" class="page" hidden>
+  <div class="topline">
+    <a class="ghost" id="history-back" href="#/">‹ Back</a>
+    <a class="ghost" id="history-play" href="#/">Play</a>
+  </div>
+  <h1 class="hist-title"><span id="history-name"></span><small>History</small></h1>
+  <div id="history-body"></div>
+</main>
+
+<noscript><p style="padding:16px">This app needs JavaScript turned on.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
