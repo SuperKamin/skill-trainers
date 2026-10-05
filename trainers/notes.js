@@ -1,6 +1,8 @@
 // Notes trainer — hear a note against C and name it (relative pitch).
-// Three modes (Leo's picks, 04/10):
+// Modes (Leo's picks, 04/10):
 //   test   — "Where am I": practice that also measures; notes unlock as you get them.
+//   easy   — two notes to start (C, G), same sound and octave, no timer, quick unlocks.
+//            Crutches on by design (Leo's OK): Easy is the ramp, the Test stays the honest measure.
 //   twin   — your most mixed-up neighbour pair, back and forth.
 //   listen — notes with their names, nothing to answer.
 // Built into every mode (a principle, not a mode): "no crutch" — octave, sound and
@@ -18,6 +20,7 @@ export default {
   blurb: 'Hear C, then a mystery note. Name it.',
   modes: [
     { id: 'test', name: 'Test', blurb: 'Name the note. New notes unlock as you get them.' },
+    { id: 'easy', name: 'Easy', blurb: 'Two notes to start, same sound every time, no timer.' },
     { id: 'twin', name: 'Twin notes', blurb: 'Your two most mixed-up notes, back and forth.' },
     { id: 'listen', name: 'Listen', blurb: 'Notes with their names. Nothing to answer.' },
   ],
@@ -37,7 +40,10 @@ export default {
         </div>
         <div class="nt-keys" data-keys></div>
         <div class="nt-foot">
-          <button type="button" class="ghost" data-again hidden>Play again</button>
+          <div class="nt-btns">
+            <button type="button" class="ghost" data-again hidden>Play again</button>
+            <button type="button" class="ghost" data-hear hidden>Hear them all</button>
+          </div>
           <span class="nt-tip">${TIP}</span>
         </div>
         <button type="button" class="nt-start" data-start>
@@ -48,7 +54,7 @@ export default {
 
     const $ = s => el.querySelector(s);
     const big = $('[data-big]'), hint = $('[data-hint]'), keys = $('[data-keys]');
-    const again = $('[data-again]'), start = $('[data-start]');
+    const again = $('[data-again]'), start = $('[data-start]'), hearBtn = $('[data-hear]');
     const say = (b, h = '') => { big.textContent = b; hint.textContent = h; };
 
     // ---------- shared answer machinery ----------
@@ -87,19 +93,23 @@ export default {
     }
 
     /** Play the mystery note and wait for a tap. Resolves to the answer record. */
-    async function ask(name, { distract = [] } = {}) {
+    const HEAR = '__hear';
+    const STEADY = { octave: 4, timbre: 'piano', db: 0 };
+
+    async function ask(name, { distract = [], steady = false } = {}) {
       let t = now() + 0.05;
       if (distract.length && Math.random() < 0.33) {
         // An extra note between reference and mystery note, so the reference can't just be held in the head.
         tone(midiOf(pick(distract.filter(n => n !== name)), 4), t, { dur: 0.4, timbre: 'piano' });
         t += 0.75;
       }
-      const v = voice();
+      const v = steady ? STEADY : voice();
       lastPlay = { name, v };
       tone(midiOf(name, v.octave), t, { dur: 1.1, timbre: v.timbre, db: v.db });
       onsetMs = performance.now() + (t - now()) * 1000;
       again.hidden = false;
       const answer = await new Promise(res => { resolveAnswer = res; });
+      if (answer === HEAR) return null;
       const ms = Math.max(0, Math.round(performance.now() - onsetMs));
       return { t: name, a: answer, ok: answer === name, ms, o: v.octave, tb: v.timbre };
     }
@@ -137,19 +147,55 @@ export default {
       await until(t + 0.35);
     }
 
+    // "Hear them all": each note you have, named, right after C. In the Test, the next
+    // 10 answers after it are practice and don't count (Leo's idea, 04/10).
+    let wantHear = false, practiceLeft = 0;
+    hearBtn.addEventListener('click', () => {
+      wantHear = true;
+      if (resolveAnswer) { const r = resolveAnswer; resolveAnswer = null; r(HEAR); }
+    });
+
+    async function hearAll(names) {
+      for (const n of names) {
+        if (!alive) return;
+        say(n, n === 'C' ? 'This is C, home.' : `This is ${n}.`);
+        let t = tone(60, now() + 0.05, { dur: 0.5 });
+        t = tone(midiOf(n, 4), t + 0.15, { dur: 0.9 });
+        await until(t + 0.5);
+      }
+    }
+
     // ---------- modes ----------
-    async function runTest() {
+    async function runTest(m = 'test') {
+      const easy = m === 'easy';
       const mine = [];
-      const prog = () => progress([...past, { mode: 'test', startedAt: Date.now(), answers: mine }]);
-      let p = prog();
+      const prog = () => progress([...past, { mode: m, startedAt: Date.now(), answers: mine }], m);
+      const testCount = progress(past, 'test').count;
+      let p = prog(), told = false;
       let since = 99, missed = false;
       drawKeys(NAMES, p.unlocked);
+      hearBtn.hidden = false;
+      if (easy) await hearAll(p.unlocked);
       while (alive) {
-        if (since >= 3 || missed) { await playReference(); since = 0; missed = false; }
+        if (wantHear) {
+          wantHear = false;
+          await hearAll(p.unlocked);
+          if (!easy) practiceLeft = 10;
+          since = 99;
+        }
         if (!alive) return;
-        say('?', 'Which note?');
-        const rec = await ask(pick(p.unlocked), { distract: p.unlocked.length >= 5 ? NAMES : [] });
+        if (easy) {
+          // Easy: C right before every note.
+          say('C', 'This is C.');
+          const t = tone(60, now() + 0.05, { dur: 0.6 });
+          await until(t + 0.2);
+        } else if (since >= 3 || missed) { await playReference(); since = 0; missed = false; }
         if (!alive) return;
+        say('?', practiceLeft ? `Which note? (practice, doesn't count: ${practiceLeft} left)` : 'Which note?');
+        const rec = await ask(pick(p.unlocked), { distract: !easy && p.unlocked.length >= 5 ? NAMES : [], steady: easy });
+        if (!alive) return;
+        if (!rec) continue; // "Hear them all" was tapped mid-question
+        if (practiceLeft) { rec.p = 1; practiceLeft -= 1; }
         mine.push(rec);
         onResult({ answer: rec });
         await feedback(rec);
@@ -157,6 +203,11 @@ export default {
         const before = p.count;
         p = prog();
         if (alive && p.count > before) await welcome(p.unlocked[p.unlocked.length - 1], p.unlocked);
+        if (alive && easy && !told && p.count > testCount && p.acc != null && p.acc >= 0.8) {
+          told = true;
+          say('✓', `You're getting these. The Test is in reach whenever you want it.`);
+          await wait(2.2);
+        }
       }
     }
 
@@ -244,10 +295,11 @@ export default {
     const startText = {
       test: `You have ${progress(past).unlocked.join(' ')}. More unlock as you get them.`,
       twin: 'Two notes, back and forth.',
+      easy: `You have ${progress(past, 'easy').unlocked.join(' ')}. First you'll hear each one.`,
       listen: 'Just listen. Nothing to answer.',
     }[mode];
     start.querySelector('[data-start-sub]').textContent = startText;
-    if (mode === 'test') drawKeys(NAMES, progress(past).unlocked);
+    if (mode === 'test' || mode === 'easy') drawKeys(NAMES, progress(past, mode).unlocked);
     if (mode === 'listen') keys.hidden = true;
     setStatus(mode === 'listen' ? '' : '0 answered');
     say('♪', '');
@@ -255,7 +307,7 @@ export default {
     start.addEventListener('click', () => {
       if (!unlockAudio()) { say('—', 'This browser can’t play sound.'); return; }
       start.hidden = true;
-      (mode === 'twin' ? runTwin() : mode === 'listen' ? runListen() : runTest())
+      (mode === 'twin' ? runTwin() : mode === 'listen' ? runListen() : runTest(mode === 'easy' ? 'easy' : 'test'))
         .catch(err => console.warn('notes:', err));
     }, { once: true });
 

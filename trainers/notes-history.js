@@ -7,12 +7,14 @@ const shortDay = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'sh
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 const pct = v => (v == null ? '–' : Math.round(v * 100) + '%');
 const sec = v => (v == null ? '–' : (v / 1000).toFixed(1) + ' s');
-const MODE = { test: 'Test', twin: 'Twin', listen: 'Listen' };
+const MODE = { test: 'Test', easy: 'Easy', twin: 'Twin', listen: 'Listen' };
 
 export function renderNotesHistory(el, sessions, source) {
   const rows = sessionRows(sessions);
-  const tests = rows.filter(r => r.mode === 'test');
+  const tests = rows.filter(r => r.mode === 'test' && !r.practice);
   const p = progress(sessions);
+  const pe = progress(sessions, 'easy');
+  const easyPlayed = rows.some(r => r.mode === 'easy');
 
   if (!rows.length) {
     el.innerHTML = `
@@ -32,6 +34,7 @@ export function renderNotesHistory(el, sessions, source) {
       ${ORDER.map((n, i) => `<span class="${i < p.count ? 'on' : ''}">${n}</span>`).join('')}
     </section>
     <p class="week">${unlockLine}</p>
+    ${easyPlayed ? `<p class="week">Easy: <b>${pe.unlocked.join(' ')}</b>${pe.next ? ` · next is ${pe.next} at 8 of the last 10 right` : ' · all seven'}.</p>` : ''}
 
     ${tests.length ? `
     <section class="card chart-card">
@@ -68,8 +71,8 @@ export function renderNotesHistory(el, sessions, source) {
             <span class="when">${dayFmt.format(r.startedAt)}<small>${timeFmt.format(r.startedAt)} · ${r.device === 'phone' ? 'phone' : 'PC'}</small></span>
             <span>${MODE[r.mode] || r.mode}</span>
             <span class="num">${r.n}</span>
-            <span class="num">${r.mode === 'listen' ? '' : pct(r.acc)}</span>
-            <span class="num">${r.mode === 'listen' ? '' : sec(r.med)}</span>
+            <span class="num">${r.mode === 'listen' ? '' : r.practice ? 'practice' : pct(r.acc)}</span>
+            <span class="num">${r.mode === 'listen' || r.practice ? '' : sec(r.med)}</span>
           </li>`).join('')}
       </ol>
     </section>
