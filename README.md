@@ -58,3 +58,12 @@ In the account: `users/{uid}/sessions/{sessionId}` = `{ trainer, startedAt, upda
 python -m http.server 8000
 ```
 Then open http://localhost:8000/. For Google sign-in to work there, `localhost` has to be in Firebase's Authorized domains (it is by default).
+
+## How a trainer is made (the recipe, from Leo — 04/10)
+1. **Research first** (`research/<trainer>.md`): what actually makes people better, what's real vs just getting good at the test.
+2. **Test mode**: practice by doing that also measures growth.
+3. **Practice modes**: drills from the research that target specific struggles or show the skill from another angle.
+4. Keep three kinds of things apart:
+   - **modes** — screens you play (`modes: [...]`)
+   - **methods** — tips you carry into any practice (`tip`, e.g. "hum it, then sing down to C")
+   - **principles** — built into every mode, not a mode of their own (e.g. Notes' "no crutch": octave, sound and loudness change so only the real skill gives the answer)

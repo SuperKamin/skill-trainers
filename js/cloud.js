@@ -16,11 +16,14 @@ const toMillis = v =>
 /** Firestore shape of one session. */
 const toDoc = s => ({
   trainer: s.trainer,
+  mode: s.mode || 'test',
   startedAt: Timestamp.fromMillis(s.startedAt),
   updatedAt: Timestamp.fromMillis(s.updatedAt || s.startedAt),
   device: s.device,
   times: s.times || [],
   early: s.early || 0,
+  answers: s.answers || [],
+  heard: s.heard || 0,
 });
 
 export function connect(config, onUser) {
@@ -77,11 +80,14 @@ export function connect(config, onUser) {
         return {
           id: d.id,
           trainer: x.trainer,
+          mode: x.mode || 'test',
           startedAt: toMillis(x.startedAt),
           updatedAt: toMillis(x.updatedAt),
           device: x.device || 'pc',
           times: Array.isArray(x.times) ? x.times : [],
           early: x.early || 0,
+          answers: Array.isArray(x.answers) ? x.answers : [],
+          heard: x.heard || 0,
         };
       });
     },

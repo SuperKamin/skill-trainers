@@ -1,6 +1,6 @@
 // The app: three views switched by the hash.
 //   #/                 Home    — trainers + sign-in
-//   #/play/<id>        Play    — one trainer, full screen
+//   #/play/<id>[/<mode>] Play  — one trainer (and mode), full screen
 //   #/history/<id>     History — graph + every session
 import * as store from './store.js';
 import { renderHistory } from './history.js';
@@ -22,6 +22,7 @@ function show(name) {
 }
 
 function leavePlay() {
+  playToken++;
   if (unmountTrainer) {
     unmountTrainer();
     unmountTrainer = null;
@@ -32,9 +33,11 @@ function leavePlay() {
 // ---------- Home ----------
 function renderHome() {
   $('trainer-list').innerHTML = trainers.map(t => `
-    <li class="trainer">
+    <li class="trainer${t.modes ? ' has-modes' : ''}">
       <a class="play" href="#/play/${t.id}"><h2>${esc(t.name)}</h2><p>${esc(t.blurb)}</p></a>
       <a class="hist" href="#/history/${t.id}" aria-label="${esc(t.name)} history">History</a>
+      ${t.modes ? `<div class="modes">${t.modes.map(m =>
+        `<a class="mode" href="#/play/${t.id}/${m.id}"><b>${esc(m.name)}</b><span>${esc(m.blurb)}</span></a>`).join('')}</div>` : ''}
     </li>`).join('');
   renderAccount(store.getState());
 }
@@ -72,12 +75,20 @@ function renderAccount(st) {
 }
 
 // ---------- Play ----------
-function renderPlay(trainer) {
-  $('play-name').textContent = trainer.name;
-  $('play-status').textContent = '0 taps';
+let playToken = 0;
+async function renderPlay(trainer, modeId) {
+  const token = ++playToken;
+  const mode = trainer.modes ? (trainer.modes.find(m => m.id === modeId) || trainer.modes[0]) : null;
+  $('play-name').textContent = mode && mode.id !== trainer.modes[0].id ? `${trainer.name} · ${mode.name}` : trainer.name;
+  $('play-status').textContent = trainer.modes ? '' : '0 taps';
   $('play-history').href = `#/history/${trainer.id}`;
-  store.beginSession(trainer.id);
+  // Trainers with modes get their past sessions (e.g. which notes are unlocked).
+  const sessions = trainer.modes ? await store.listSessions(trainer.id) : [];
+  if (token !== playToken) return;
+  store.beginSession(trainer.id, mode ? mode.id : 'test');
   unmountTrainer = trainer.mount($('play-stage'), result => store.record(result), {
+    mode: mode && mode.id,
+    sessions,
     setStatus: text => { $('play-status').textContent = text; },
   });
 }
@@ -96,12 +107,14 @@ async function renderHistoryView(trainer) {
   const source = st.user
     ? `Saved to your account (${esc(st.user.firstName)}), on every device you sign in on.`
     : 'Kept on this device only. Sign in on Home to keep it everywhere.';
-  redrawHistory = renderHistory(body, trainer, sessions, source);
+  redrawHistory = trainer.renderHistory
+    ? trainer.renderHistory(body, sessions, source)
+    : renderHistory(body, trainer, sessions, source);
 }
 
 // ---------- routing ----------
 function route() {
-  const [, view, id] = (location.hash || '#/').split('/');
+  const [, view, id, modeId] = (location.hash || '#/').split('/');
   const trainer = id ? byId(decodeURIComponent(id)) : null;
 
   leavePlay();
@@ -109,7 +122,7 @@ function route() {
 
   if (view === 'play' && trainer) {
     show('play');
-    renderPlay(trainer);
+    renderPlay(trainer, modeId);
     lastView = 'play';
   } else if (view === 'history' && trainer) {
     show('history');

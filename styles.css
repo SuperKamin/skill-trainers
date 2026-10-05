@@ -186,3 +186,72 @@ a { touch-action: manipulation; }
 .loading { color: var(--dim); margin: 2rem 0; }
 
 @media (prefers-reduced-motion: reduce) { .rx-pad { transition: none; } }
+
+/* ---------- Home: trainers with modes ---------- */
+.trainer.has-modes { flex-wrap: wrap; }
+.trainer .modes {
+  flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  border-top: 1px solid var(--line);
+}
+.trainer .mode {
+  display: grid; gap: 0.2rem; padding: 0.75rem 1.1rem; color: inherit; text-decoration: none;
+  border-right: 1px solid var(--line); min-width: 0;
+}
+.trainer .mode:last-child { border-right: 0; }
+.trainer .mode:hover { background: var(--wait); }
+.trainer .mode b { font-weight: 700; }
+.trainer .mode span { color: var(--dim); font-size: 0.85rem; line-height: 1.35; }
+
+/* ---------- Notes ---------- */
+.nt {
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.2rem; padding: calc(3.5rem + var(--safe-t)) calc(16px + var(--safe-r)) calc(1rem + var(--safe-b)) calc(16px + var(--safe-l));
+  background: var(--ink); text-align: center;
+}
+.nt-show { display: grid; gap: 0.5rem; justify-items: center; min-height: 12rem; align-content: center; }
+.nt-big { font-family: var(--display); font-weight: 900; font-size: clamp(5rem, 26vw, 10rem); line-height: 0.9; }
+.nt-hint { color: var(--dim); font-size: 1.05rem; max-width: 32ch; min-height: 2.6em; }
+.nt-keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.45rem; width: 100%; max-width: 560px; }
+.nt-keys.twin { grid-template-columns: 1fr 1fr; max-width: 360px; }
+.nt-key {
+  min-height: 64px; border-radius: 14px; border: 1px solid var(--line); background: var(--card);
+  font-family: var(--display); font-weight: 900; font-size: 2rem; cursor: pointer; transition: background 0.15s, transform 0.1s;
+}
+.nt-keys.twin .nt-key { min-height: 96px; font-size: 3rem; }
+.nt-key:active { transform: scale(0.96); }
+.nt-key:disabled { opacity: 0.22; cursor: default; }
+.nt-key.yes { background: var(--go); color: var(--go-ink); }
+.nt-key.no { background: var(--early); }
+.nt-foot { display: grid; gap: 0.3rem; justify-items: center; }
+.nt-tip { color: var(--dim); font-size: 0.82rem; max-width: 34ch; }
+.nt-pairs { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; max-width: 420px; }
+.chip {
+  border: 1px solid var(--line); background: none; border-radius: 999px; padding: 0.4rem 0.8rem;
+  color: var(--dim); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.chip.on { background: var(--go); color: var(--go-ink); border-color: transparent; font-weight: 700; }
+.nt-start {
+  position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; gap: 0.6rem; padding: 16px;
+  background: var(--ink); border: 0; cursor: pointer; text-align: center;
+}
+.nt-start b { font-family: var(--display); font-weight: 900; font-size: clamp(3rem, 14vw, 6rem); color: var(--go); line-height: 0.9; }
+.nt-start span { color: var(--dim); max-width: 30ch; margin: 0 auto; }
+@media (max-width: 420px) {
+  .nt-keys:not(.twin) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ---------- Notes history ---------- */
+.nt-unlocks { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.4rem 0 0.2rem; }
+.nt-unlocks span {
+  width: 2.6rem; height: 2.6rem; display: grid; place-items: center; border-radius: 10px;
+  border: 1px dashed var(--line); color: var(--dim); font-family: var(--display); font-weight: 900; font-size: 1.4rem;
+}
+.nt-unlocks span.on { border: 0; background: var(--go); color: var(--go-ink); }
+.sub { font-family: var(--display); font-weight: 900; font-size: 1.8rem; margin: 1.6rem 0 0.6rem; }
+.grid-wrap { overflow-x: auto; }
+.conf { border-collapse: separate; border-spacing: 3px; font-variant-numeric: tabular-nums; }
+.conf th { font-weight: 700; color: var(--dim); padding: 0.2rem 0.4rem; }
+.conf th.label { font-size: 0.62rem; text-align: left; white-space: nowrap; }
+.conf td { width: 2.3rem; height: 2.3rem; text-align: center; border-radius: 6px; background: var(--card); }
+.conf td.hit { background: color-mix(in srgb, var(--paper) calc(var(--a) * 35%), var(--card)); }
+.conf td.miss { background: color-mix(in srgb, var(--go) calc(var(--a) * 100%), var(--card)); color: var(--go-ink); font-weight: 700; }

@@ -1,7 +1,7 @@
 // Service worker: keeps the app working offline and makes it installable.
 // The app's own files are network-first, so updates arrive without bumping CACHE.
 // Bump CACHE only when the SHELL list changes.
-const CACHE = 'skill-trainers-v1';
+const CACHE = 'skill-trainers-v2';
 
 // Relative to this file, so it works under https://<user>.github.io/<repo>/.
 const SHELL = [
@@ -17,6 +17,10 @@ const SHELL = [
   './js/cloud.js',
   './trainers/index.js',
   './trainers/reaction.js',
+  './trainers/notes.js',
+  './trainers/notes-logic.js',
+  './trainers/notes-audio.js',
+  './trainers/notes-history.js',
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
