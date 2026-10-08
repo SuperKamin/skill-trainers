@@ -50,6 +50,9 @@ export function renderTypingHistory(el, sessions, source) {
     const prev7 = mean(tests.filter(r => r.at >= now - 14 * DAY && r.at < now - 7 * DAY).map(r => r.wpm));
     const best = tests.length ? Math.max(...tests.map(r => r.wpm)) : null;
     const accAvg = mean(tests.slice(-10).map(r => r.acc));
+    const consAvg = mean(tests.filter(r => r.cons != null).slice(-10).map(r => r.cons));
+    const bestBy = [15, 30, 60].map(l => { const w = tests.filter(r => r.len === l).map(r => r.wpm); return { l, w: w.length ? Math.max(...w) : null }; })
+      .filter(b => b.w != null);
     const wk = weakKeys(mine.slice(-30));
     const byErr = [...wk].sort((a, b) => b.err - a.err).filter(x => x.err > 0).slice(0, 6);
     const bySlow = [...wk].filter(x => x.ms).sort((a, b) => b.ms - a.ms).slice(0, 6);
@@ -62,8 +65,10 @@ export function renderTypingHistory(el, sessions, source) {
       <section class="tiles">
         <div class="tile"><span class="label">Best</span><b>${fmt(best)}<small> wpm</small></b></div>
         <div class="tile"><span class="label">Accuracy</span><b>${accAvg == null ? '–' : Math.round(accAvg * 100) + '%'}</b></div>
+        ${consAvg != null ? `<div class="tile"><span class="label">Consistency</span><b>${Math.round(consAvg)}%</b></div>` : ''}
         <div class="tile"><span class="label">Tests</span><b>${tests.length}</b></div>
       </section>
+      ${bestBy.length > 1 ? `<p class="week">Best by length: ${bestBy.map(b => `${b.l} s <b>${Math.round(b.w)}</b>`).join(' · ')}</p>` : ''}
       <p class="week">Last 7 days: <b>${fmt(last7)} wpm</b> · week before: <b>${fmt(prev7)} wpm</b>${devices.length > 1 ? ` · on ${shownDevice === 'pc' ? 'PC' : 'phone'}` : ''}</p>
 
       ${byErr.length || bySlow.length ? `
@@ -127,6 +132,42 @@ function chart(rows, W) {
   }
   const rad = rows.length > 80 ? 2.6 : 3.6;
   rows.forEach((r, i) => out.push(`<circle class="avg" cx="${x(r.at).toFixed(1)}" cy="${y(v[i]).toFixed(1)}" r="${rad}"><title>${dayFmt.format(r.at)} ${timeFmt.format(r.at)} · ${Math.round(r.wpm)} wpm · ${Math.round(r.acc * 100)}% · ${r.len} s</title></circle>`));
+  out.push('</svg>');
+  return out.join('');
+}
+
+/** One run, second by second: wpm (bright line), raw (faint line), and a red × on seconds with mistakes. */
+export function runChart(run, W) {
+  const sec = run.sec;
+  if (!sec || !sec.wpm || sec.wpm.length < 2) return '';
+  const N = sec.wpm.length;
+  const H = W < 520 ? 170 : 210;
+  const m = { l: 40, r: 12, t: 24, b: 24 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const top = Math.max(...sec.wpm, ...sec.raw, 10);
+  const step = top > 120 ? 40 : top > 60 ? 20 : 10;
+  const y1 = Math.ceil(top / step) * step;
+  const y = v => m.t + ih - (Math.min(v, y1) / y1) * ih;
+  const x = i => m.l + (N === 1 ? iw / 2 : (i / (N - 1)) * iw);
+  const out = [`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`,
+    `<text class="ax-cap" x="${m.l}" y="13">wpm · each second</text>`];
+  for (let v = 0; v <= y1; v += step) {
+    const yy = y(v).toFixed(1);
+    out.push(`<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"/>`, `<text class="ax" x="${m.l - 6}" y="${yy}" dy="0.32em" text-anchor="end">${v}</text>`);
+  }
+  const every = N > 40 ? 10 : N > 16 ? 5 : N > 8 ? 2 : 1;
+  for (let i = 0; i < N; i++) {
+    if ((i + 1) % every) continue;
+    out.push(`<text class="ax" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${i + 1}</text>`);
+  }
+  const line = a => a.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  out.push(`<polyline class="raw" points="${line(sec.raw)}"/>`, `<polyline class="trend" points="${line(sec.wpm)}"/>`);
+  sec.wpm.forEach((v, i) => out.push(`<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="6"><title>${i + 1} s · ${v} wpm · ${sec.raw[i]} raw${sec.err[i] ? ` · ${sec.err[i]} wrong` : ''}</title></circle>`));
+  sec.err.forEach((e, i) => {
+    if (!e) return;
+    const cx = x(i), cy = y(sec.raw[i]) - 9, r = e > 2 ? 4.5 : 3.5;
+    out.push(`<path class="errm" d="M${(cx - r).toFixed(1)},${(cy - r).toFixed(1)}L${(cx + r).toFixed(1)},${(cy + r).toFixed(1)}M${(cx + r).toFixed(1)},${(cy - r).toFixed(1)}L${(cx - r).toFixed(1)},${(cy + r).toFixed(1)}"><title>${i + 1} s · ${e} wrong</title></path>`);
+  });
   out.push('</svg>');
   return out.join('');
 }

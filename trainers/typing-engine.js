@@ -21,6 +21,16 @@ export const MIN_RUN_CHARS = 10;
 export const wpmOf = (chars, ms) => (ms > 0 ? (chars / 5) / (ms / 60000) : 0);
 
 const isLetter = c => c >= 'a' && c <= 'z';
+
+/** Consistency like Monkeytype: 100 = perfectly even speed second to second (from the raw speed's coefficient of variation). */
+export function consistency(raw) {
+  if (!raw || raw.length < 2) return null;
+  const m = raw.reduce((a, b) => a + b, 0) / raw.length;
+  if (!m) return null;
+  const sd = Math.sqrt(raw.reduce((a, b) => a + (b - m) ** 2, 0) / raw.length);
+  const cv = sd / m;
+  return Math.round(Math.max(0, 100 * (1 - Math.tanh(cv + cv ** 3 / 3 + cv ** 5 / 5))));
+}
 const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c);
 
 /**
@@ -31,7 +41,8 @@ const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' 
  *   stopOnError  — the run ends at the first wrong key (Clean run)
  *   onStart()    — first keystroke
  *   onTick({ elapsed, left, wpm, chars }) — about 4×/s while running
- *   onDone(run)  — finished; run = { ms, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, ended }
+ *   onDone(run)  — finished; run = { ms, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, ended,
+ *                  sec: { wpm[], raw[], err[] } (one per second), cons (consistency %, or null), ch: { ok, bad, x, miss } }
  *   onKey({ want, ok, dt }) — every scored keystroke at the end of the text (dt = ms since the key before, or null)
  *   onCaret(nextChar)       — whenever the next character to type changes (null at the end)
  * reset(text, marks): marks = Set of character positions in text to highlight (e.g. the pairs being drilled).
@@ -55,6 +66,8 @@ export function createTyper(el, opts = {}) {
   // key → [times typed, mistakes, total ms since previous key, how many of those were timed]
   let keys = {}, pairs = {};
   let lastNext;
+  // Second by second: cumulative wpm at the end of each second, and keys / wrong keys typed in it.
+  let secWpm = [], secKeys = [], secErr = [];
 
   const bump = (map, k, ok, dt) => {
     const r = map[k] || (map[k] = [0, 0, 0, 0]);
@@ -173,6 +186,27 @@ export function createTyper(el, opts = {}) {
     return { ms, correct, wpm: wpmOf(correct, ms), raw: wpmOf(typed.length, ms) };
   }
 
+  /** Record the wpm at every whole second that has passed (up to the run's length). */
+  function sample(now) {
+    if (!started) return;
+    const limit = opts.seconds || Infinity;
+    while (secWpm.length < limit && now - started >= (secWpm.length + 1) * 1000) {
+      secWpm.push(Math.round(wpmOf(stats(now).correct, (secWpm.length + 1) * 1000)));
+    }
+  }
+
+  /** Letters right / wrong / extra / missed in what's on screen now (missed = skipped in a finished word). */
+  function letters() {
+    const ch = { ok: 0, bad: 0, x: 0, miss: 0 };
+    typedW.forEach((g, i) => {
+      const w = tw[i] ?? '';
+      for (let c = 0; c < Math.min(g.length, w.length); c++) g[c] === w[c] ? ch.ok++ : ch.bad++;
+      if (g.length > w.length) ch.x += g.length - w.length;
+      else if (i < typedW.length - 1) ch.miss += w.length - g.length;
+    });
+    return ch;
+  }
+
   function finish(ended = 'time') {
     if (done || !started) return;
     done = true;
@@ -181,6 +215,20 @@ export function createTyper(el, opts = {}) {
     caret.classList.add('idle');
     const end = opts.seconds && ended === 'time' ? started + opts.seconds * 1000 : performance.now();
     const s = stats(end);
+    sample(end);
+    // A last part-second of at least half a second gets its own point.
+    const rest = s.ms - secWpm.length * 1000;
+    const n = secWpm.length + (rest >= 500 ? 1 : 0);
+    if (n > secWpm.length) secWpm.push(Math.round(s.wpm));
+    const raw = [], err = [];
+    for (let b = 0; b < n; b++) {
+      const len = b < Math.floor(s.ms / 1000) ? 1000 : Math.max(rest, 1);
+      // Keys typed after the last whole second count in the last point.
+      const k = (secKeys[b] || 0) + (b === n - 1 ? secKeys.slice(n).reduce((a, x) => a + (x || 0), 0) : 0);
+      const e = (secErr[b] || 0) + (b === n - 1 ? secErr.slice(n).reduce((a, x) => a + (x || 0), 0) : 0);
+      raw.push(Math.round(wpmOf(k, len)));
+      err.push(e);
+    }
     // Whole words right before the first wrong one (for Clean run).
     let wordsClean = 0;
     while (wordsClean < typedW.length && typedW[wordsClean] === tw[wordsClean] &&
@@ -197,6 +245,9 @@ export function createTyper(el, opts = {}) {
       keys,
       pairs,
       ended,
+      sec: { wpm: secWpm.slice(0, n), raw, err },
+      cons: consistency(raw),
+      ch: letters(),
     });
   }
 
@@ -206,6 +257,7 @@ export function createTyper(el, opts = {}) {
     opts.onStart && opts.onStart();
     tick = setInterval(() => {
       const t = performance.now(), s = stats(t);
+      sample(t);
       const elapsed = (t - started) / 1000;
       opts.onTick && opts.onTick({ elapsed, left: opts.seconds ? Math.max(0, opts.seconds - elapsed) : null, wpm: s.wpm, chars: s.correct });
     }, 250);
@@ -233,6 +285,7 @@ export function createTyper(el, opts = {}) {
     }
     if (val === typed) { paintSelection(); placeCaret(); return; }
     const now = performance.now();
+    sample(now); // seconds that ended before this key, measured before it lands
 
     // What changed: same start (p) and same end (s); in between, something removed and/or added.
     let p = 0;
@@ -261,6 +314,9 @@ export function createTyper(el, opts = {}) {
       else { want = w[c]; ok = ch === want; }
       strokes++; if (ok) goodStrokes++;
       if (!ok) wrong = true;
+      const b = Math.floor((now - started) / 1000);
+      secKeys[b] = (secKeys[b] || 0) + 1;
+      if (!ok) secErr[b] = (secErr[b] || 0) + 1;
       if (!atEnd) continue; // edits further back: no timing, no key/pair stats
       // Only single keystrokes give a fair time (a pasted/autocorrected chunk doesn't).
       const dt = added.length === 1 && strokes > 1 ? now - lastKeyAt : null;
@@ -310,6 +366,7 @@ export function createTyper(el, opts = {}) {
       clearInterval(tick); clearTimeout(timer);
       target = text; typed = ''; typedW = ['']; input.value = ''; marks = markSet || new Set();
       started = 0; done = false; strokes = 0; goodStrokes = 0; fixes = 0; keys = {}; pairs = {};
+      secWpm = []; secKeys = []; secErr = [];
       lastNext = undefined;
       textEl.querySelectorAll('.w, .sp').forEach(n => n.remove());
       wordEls = []; spEls = [];

@@ -162,13 +162,17 @@ a { touch-action: manipulation; }
 .chart .best { fill: none; stroke: var(--go); stroke-opacity: 0.55; stroke-width: 1.5; }
 .chart .avg { fill: var(--paper); }
 .chart .trend { fill: none; stroke: var(--go); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .raw { fill: none; stroke: var(--dim); stroke-opacity: 0.45; stroke-width: 1.5; stroke-linejoin: round; }
+.chart .pt { fill: transparent; }
+.chart .pt:hover { fill: var(--go); fill-opacity: 0.35; }
+.chart .errm { stroke: var(--miss); stroke-width: 2; stroke-linecap: round; }
 .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; padding: 0.4rem 0.4rem 0; font-size: 0.82rem; color: var(--dim); }
 .legend i { display: inline-block; vertical-align: middle; margin-right: 0.4rem; }
 .lg-avg { width: 8px; height: 8px; border-radius: 50%; background: var(--paper); }
 .lg-best { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--go); opacity: 0.7; }
 .lg-trend { width: 16px; height: 2.5px; border-radius: 2px; background: var(--go); }
 
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-top: 0.9rem; }
+.tiles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.6rem; margin-top: 0.9rem; }
 .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem 0.8rem; display: grid; gap: 0.3rem; min-width: 0; }
 .tile b { font-family: var(--display); font-weight: 700; font-size: 1.9rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .week { margin: 0.9rem 0 1.4rem; color: var(--dim); font-variant-numeric: tabular-nums; }
@@ -263,7 +267,7 @@ a { touch-action: manipulation; }
 .ty {
   position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 1.2rem;
   padding: calc(4rem + var(--safe-t)) calc(16px + var(--safe-r)) calc(1rem + var(--safe-b)) calc(16px + var(--safe-l));
-  background: var(--ink);
+  background: var(--ink); overflow-y: auto;
 }
 .ty-bar { width: 100%; max-width: 760px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .ty-lens { display: flex; gap: 0.4rem; transition: opacity 0.2s; }
@@ -293,8 +297,8 @@ a { touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) { .ty-caret, .ty-text { transition: none; } }
 .ty-input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
 .ty-hint { color: var(--dim); text-align: center; max-width: 36ch; margin: 0; }
-.ty-result { display: grid; justify-items: center; gap: 0.9rem; text-align: center; }
-.ty-score b { font-family: var(--display); font-weight: 900; font-size: clamp(5rem, 24vw, 9rem); line-height: 0.9; }
+.ty-result { display: grid; justify-items: center; gap: 0.9rem; text-align: center; width: 100%; max-width: 760px; }
+.ty-score b { font-family: var(--display); font-weight: 900; font-size: clamp(4.2rem, 18vw, 7rem); line-height: 0.9; }
 .ty-score span { font-family: var(--display); font-weight: 700; font-size: 1.6rem; color: var(--dim); margin-left: 0.3rem; }
 .ty-sub { display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: center; color: var(--dim); font-variant-numeric: tabular-nums; }
 .ty-sub b { color: var(--paper); }
@@ -320,6 +324,16 @@ body.ty-focus .play-top, body.ty-focus .ty-lens, body.ty-focus .ty-bar .ghost, b
 body.ty-focus { cursor: none; }
 .ty-usual { color: var(--dim); margin: 0; font-variant-numeric: tabular-nums; }
 .ty-usual b { color: var(--paper); }
+.ty-run { width: 100%; max-width: 760px; }
+.ty-run .chart-key { display: flex; gap: 1rem; justify-content: center; color: var(--dim); font-size: 0.82rem; margin-top: 0.2rem; }
+.ty-run .chart-key i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 0.35rem; background: var(--go); }
+.ty-run .chart-key i.r { background: var(--dim); opacity: 0.6; }
+.ty-run .chart-key i.e { background: none; width: auto; height: auto; color: var(--miss); font-style: normal; font-weight: 700; }
+.ty-ch { display: flex; gap: 0.3rem 1.1rem; flex-wrap: wrap; justify-content: center; color: var(--dim); font-variant-numeric: tabular-nums; margin: 0; }
+.ty-ch b { color: var(--paper); }
+.ty-ch .bad b, .ty-ch .x b { color: var(--miss); }
+.ty-pb { margin: 0; color: var(--go); font-weight: 700; }
+.ty-pb.first { color: var(--dim); font-weight: 400; }
 .ty-pairs { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; justify-content: center; font-variant-numeric: tabular-nums; color: var(--dim); }
 .ty-pairs b { color: var(--paper); }
 .ty-lens kbd { min-width: 2.4rem; }

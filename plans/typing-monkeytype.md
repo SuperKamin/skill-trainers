@@ -1,6 +1,6 @@
 # Plan: make Typing feel like Monkeytype
 
-Status: **stage 1 done + live (08/10)**; stages 2–4 not started. Picked 08/10. Written so a fresh session can build it without the conversation.
+Status: **stages 1–2 done + live (08/10)**; stages 3–4 not started. Picked 08/10. Written so a fresh session can build it without the conversation.
 Read first: `README.md` (trainer recipe + interface), `research/typing.md`, `trainers/typing-engine.js`, `trainers/typing.js`.
 
 ## Goal
@@ -97,7 +97,7 @@ mcfunction) · punctuation · numbers · sound. Remember the choices on the devi
 ## Suggested build order (each stage shippable on its own)
 1. ✅ **Engine + look** (08/10): per-word model, extra/missed letters, editing keys (A5), caret + selection, 3 lines, focus mode.
    *(the risky part: phone input + editing keys)* Test every key in A5 on PC before pushing.
-2. **Results**: per-second series, graph, consistency, letter breakdown, personal best, new session fields + History.
+2. ✅ **Results** (08/10): per-second series, graph, consistency, letter breakdown, personal best, new session fields + History.
 3. **Content**: word-count + zen modes, punctuation/numbers, Portuguese list, pack registry + GDScript + mcfunction.
 4. **Sounds**.
 

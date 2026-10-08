@@ -75,7 +75,7 @@ Account: `users/{uid}/sessions/{sessionId}` = `{ trainer, mode, startedAt, updat
 
 - Reaction: `times` (ms; taps under 80 ms never count), `early`.
 - Notes: `answers` = `{ t: played, a: answered, ok, ms, o: octave, tb: timbre, p?: practice }`. Unlocks are worked out from the answers, never stored.
-- Typing: `runs` = `{ m: mode, at, len?, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, focus?, words? }`; `keys`/`pairs` = `[times, mistakes, ms total, timed count]`.
+- Typing: `runs` = `{ m: mode, at, len?, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, focus?, words?, sec?, cons?, ch? }`; since stage 2: `sec` = `{ wpm[], raw[], err[] }` one per second (cumulative wpm, raw that second, wrong keys that second), `cons` = consistency % (Monkeytype's formula on `sec.raw`), `ch` = `{ ok, bad, x, miss }` letters right/wrong/extra/missed. Personal best (result screen) = best wpm per Test length, or most clean words, same device only; it only ever adds; `keys`/`pairs` = `[times, mistakes, ms total, timed count]`.
 - Typing engine (`typing-engine.js`): the hidden `<input>` is the source of truth, so all text-box keys work (Ctrl+Backspace, Delete, arrows, Ctrl/Shift+arrows, typing over a selection, inserting mid-text); the screen just draws its text, caret and selection. Monkeytype-style words: typed word *i* lines up with target word *i*; space jumps on; extra letters shown, unfinished/wrong words underlined, missing letters marked. Timing (`keys`, `pairs`) only counts keys added at the end; any edit further back is a fix. Focus mode (`body.ty-focus`) fades everything but the words + counter while typing; mouse move brings it back. Plan for the rest: `plans/typing-monkeytype.md`.
 
 ## Testing locally

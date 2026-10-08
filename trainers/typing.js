@@ -12,7 +12,7 @@
 
 import { createTyper, MIN_RUN_CHARS } from './typing-engine.js';
 import { words, pairText } from './typing-words.js';
-import { allRuns, weakKeys } from './typing-history.js';
+import { allRuns, weakKeys, runChart } from './typing-history.js';
 import { drawKeyboard, legendHtml, currentLayout, setLayout, detectLayout, codeFor, resetFingers, LAYOUTS } from './keyboard.js';
 
 // Learn the keys: a key counts as learned after 3 fast, right presses in a row.
@@ -217,6 +217,33 @@ export default {
     }
 
     // ---------- result screens ----------
+    const devName = device === 'pc' ? 'PC' : 'phone';
+
+    /** Personal best: only ever adds. Test = best wpm per length; Clean run = most clean words. Same device only. */
+    function bestLine(run) {
+      if (mode !== 'test' && mode !== 'clean') return '';
+      const before = [...past, ...done.slice(0, -1)].filter(r => (r.m || 'test') === mode && (mode !== 'test' || r.len === len));
+      if (mode === 'clean') {
+        const w = cleanWords(run);
+        if (!before.length) return w ? `<p class="ty-pb first">Your first clean run on ${devName}: ${w} to beat next time.</p>` : '';
+        const was = Math.max(...before.map(r => r.words || 0));
+        return w > was ? `<p class="ty-pb">New best clean run 🎉 <small>(was ${was})</small></p>` : '';
+      }
+      if (!before.length) return `<p class="ty-pb first">Your first ${len} s test on ${devName}: this is the one to beat.</p>`;
+      const was = Math.max(...before.map(r => r.wpm));
+      return run.wpm > was ? `<p class="ty-pb">New best for ${len} s 🎉 <small>(was ${Math.round(was)})</small></p>` : '';
+    }
+
+    /** Speed graph + letter breakdown (runs from before stage 2 have neither). */
+    function runBlock(run) {
+      const ch = run.ch;
+      return `
+        ${run.sec && run.sec.wpm && run.sec.wpm.length >= 2 ? `<div class="ty-run"><div class="chart" data-runchart role="img" aria-label="Speed each second of this run"></div>
+          <div class="chart-key"><span><i></i>wpm</span><span><i class="r"></i>raw</span>${run.sec.err.some(Boolean) ? '<span><i class="e">×</i>mistakes</span>' : ''}</div></div>` : ''}
+        ${ch ? `<p class="ty-ch"><span><b>${ch.ok}</b> right</span><span class="bad"><b>${ch.bad}</b> wrong</span><span class="x"><b>${ch.x}</b> extra</span><span><b>${ch.miss}</b> missed</span></p>` : ''}`;
+    }
+    const consSpan = run => (run.cons != null ? `<span><b>${run.cons}%</b> consistency</span>` : '');
+
     function usualLine(run) {
       // Compared only with your own usual on this device (median of your last 10 like it).
       const same = [...past, ...done.slice(0, -1)].filter(r => (r.m || 'test') === mode && (mode !== 'test' || r.len === len)).slice(-10);
@@ -254,7 +281,8 @@ export default {
         const n = Object.values(known).filter(v => v >= KNOWN_AFTER).length;
         result.innerHTML = `
           <div class="ty-score"><b>${Math.round(run.wpm)}</b><span>wpm</span></div>
-          <div class="ty-sub"><span><b>${Math.round(run.acc * 100)}%</b> accuracy</span><span><b>${n}</b> keys learned</span></div>
+          <div class="ty-sub"><span><b>${Math.round(run.acc * 100)}%</b> accuracy</span>${consSpan(run)}<span><b>${n}</b> keys learned</span></div>
+          ${runBlock(run)}
           <p class="ty-usual">A key counts as learned after ${KNOWN_AFTER} fast, right presses in a row. A miss lights it up again.</p>
           ${stop}
           <button type="button" class="btn go" data-again>Again</button>
@@ -264,6 +292,8 @@ export default {
         result.innerHTML = `
           <div class="ty-score"><b>${w}</b><span>${w === 1 ? 'word' : 'words'} clean</span></div>
           <div class="ty-sub"><span><b>${Math.round(run.wpm)}</b> wpm while clean</span><span><b>${run.correct}</b> letters</span></div>
+          ${bestLine(run)}
+          ${runBlock(run)}
           ${usualLine(run)}${stop}
           <button type="button" class="btn go" data-again>Again</button>
           <p class="fine">Tab or Enter also starts again.</p>`;
@@ -272,15 +302,20 @@ export default {
           <div class="ty-score"><b>${Math.round(run.wpm)}</b><span>wpm</span></div>
           <div class="ty-sub">
             <span><b>${Math.round(run.acc * 100)}%</b> accuracy</span>
-            <span><b>${run.fixes}</b> ${run.fixes === 1 ? 'fix' : 'fixes'}</span>
+            ${consSpan(run)}
             <span><b>${Math.round(run.raw)}</b> raw</span>
+            <span><b>${run.fixes}</b> ${run.fixes === 1 ? 'fix' : 'fixes'}</span>
           </div>
+          ${bestLine(run)}
+          ${runBlock(run)}
           ${mode === 'pairs' ? pairLine(run) : trickiest(run.keys)}
           ${usualLine(run)}${stop}
           <button type="button" class="btn go" data-again>Again</button>
           <p class="fine">Tab or Enter also starts again.</p>`;
       }
       result.querySelector('[data-again]').addEventListener('click', fresh);
+      const rc = result.querySelector('[data-runchart]');
+      if (rc) rc.innerHTML = runChart(run, Math.round(rc.clientWidth) || 340);
     }
 
     lens.addEventListener('click', e => {
