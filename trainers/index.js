@@ -5,9 +5,12 @@
 import reaction from './reaction.js';
 import notes from './notes.js';
 import { renderNotesHistory } from './notes-history.js';
+import typing from './typing.js';
+import { renderTypingHistory } from './typing-history.js';
 
 notes.renderHistory = renderNotesHistory;
+typing.renderHistory = renderTypingHistory;
 
-export const trainers = [reaction, notes];
+export const trainers = [reaction, notes, typing];
 
 export const byId = id => trainers.find(t => t.id === id);

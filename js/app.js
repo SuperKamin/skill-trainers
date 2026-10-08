@@ -89,6 +89,7 @@ async function renderPlay(trainer, modeId) {
   unmountTrainer = trainer.mount($('play-stage'), result => store.record(result), {
     mode: mode && mode.id,
     sessions,
+    device: store.deviceGuess(),
     setStatus: text => { $('play-status').textContent = text; },
   });
 }

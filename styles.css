@@ -9,6 +9,7 @@
   --go-ink: #1d1400;     /* text on go */
   --card: #1b1c2d;       /* raised surface on ink */
   --line: rgba(169, 163, 199, 0.18);
+  --miss: #ff7a8a;       /* a typo, gentle not alarming */
   --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
   --body: "Atkinson Hyperlegible", system-ui, sans-serif;
   --safe-t: env(safe-area-inset-top, 0px);
@@ -257,3 +258,53 @@ a { touch-action: manipulation; }
 .conf td.miss { background: color-mix(in srgb, var(--go) calc(var(--a) * 100%), var(--card)); color: var(--go-ink); font-weight: 700; }
 
 .nt-btns { display: flex; gap: 1rem; justify-content: center; }
+
+/* ---------- Typing ---------- */
+.ty {
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 1.2rem;
+  padding: calc(4rem + var(--safe-t)) calc(16px + var(--safe-r)) calc(1rem + var(--safe-b)) calc(16px + var(--safe-l));
+  background: var(--ink);
+}
+.ty-bar { width: 100%; max-width: 760px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.ty-lens { display: flex; gap: 0.4rem; transition: opacity 0.2s; }
+.ty-lens.dim { opacity: 0.25; pointer-events: none; }
+.ty-live { font-variant-numeric: tabular-nums; color: var(--dim); }
+.ty-live b { font-family: var(--display); font-weight: 900; font-size: 2rem; color: var(--go); }
+.ty-stage { width: 100%; max-width: 760px; position: relative; }
+.ty-box { height: calc(3 * 2.6rem); overflow: hidden; cursor: text; outline: none; }
+.ty-text {
+  font-family: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: clamp(1.15rem, 4.6vw, 1.6rem); line-height: 2.6rem; color: var(--dim); opacity: 0.75;
+  word-break: normal; overflow-wrap: break-word; transition: transform 0.12s ease-out;
+}
+.ty-text span.ok { color: var(--paper); opacity: 1; }
+.ty-text span.bad { color: var(--miss); opacity: 1; text-decoration: underline; text-decoration-thickness: 2px; }
+.ty-text span.sp.bad { background: color-mix(in srgb, var(--miss) 45%, transparent); text-decoration: none; }
+.ty-text span.caret { box-shadow: -2px 0 0 var(--go); }
+.ty-input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
+.ty-hint { color: var(--dim); text-align: center; max-width: 36ch; margin: 0; }
+.ty-result { display: grid; justify-items: center; gap: 0.9rem; text-align: center; }
+.ty-score b { font-family: var(--display); font-weight: 900; font-size: clamp(5rem, 24vw, 9rem); line-height: 0.9; }
+.ty-score span { font-family: var(--display); font-weight: 700; font-size: 1.6rem; color: var(--dim); margin-left: 0.3rem; }
+.ty-sub { display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: center; color: var(--dim); font-variant-numeric: tabular-nums; }
+.ty-sub b { color: var(--paper); }
+.ty-keys { color: var(--dim); margin: 0; }
+kbd {
+  display: inline-grid; place-items: center; min-width: 1.9rem; height: 1.9rem; padding: 0 0.35rem; border-radius: 7px;
+  background: var(--card); border: 1px solid var(--line); border-bottom-width: 3px; color: var(--paper);
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace; font-size: 0.95rem;
+}
+.ty-devs { display: flex; gap: 0.4rem; margin-bottom: 0.8rem; }
+.ty-weak { display: grid; gap: 0.8rem; }
+.ty-weak p { margin: 0.35rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem 0.7rem; align-items: center; }
+.ty-weak small { color: var(--dim); font-variant-numeric: tabular-nums; margin-left: 0.2rem; }
+.tile b small { font-size: 0.5em; color: var(--dim); }
+
+.ty-text span.mk { color: var(--go); opacity: 0.9; }
+.ty-text span.mk.ok { color: var(--go); }
+.ty-tip { color: var(--dim); font-size: 0.85rem; text-align: center; max-width: 40ch; margin: auto 0 0; }
+.ty-usual { color: var(--dim); margin: 0; font-variant-numeric: tabular-nums; }
+.ty-usual b { color: var(--paper); }
+.ty-pairs { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; justify-content: center; font-variant-numeric: tabular-nums; color: var(--dim); }
+.ty-pairs b { color: var(--paper); }
+.ty-lens kbd { min-width: 2.4rem; }

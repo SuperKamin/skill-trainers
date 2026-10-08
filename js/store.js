@@ -59,7 +59,7 @@ function saveLocal(s) {
   writeLocalMap(map);
 }
 
-const worthSaving = s => s && (s.times.length > 0 || s.early > 0 || (s.answers || []).length > 0 || s.heard > 0);
+const worthSaving = s => s && (s.times.length > 0 || s.early > 0 || (s.answers || []).length > 0 || s.heard > 0 || (s.runs || []).length > 0);
 const userView = u => u && {
   uid: u.uid,
   firstName: (u.displayName || u.email || '').split(/[\s@]/)[0],
@@ -134,7 +134,7 @@ export async function signOut() {
 export function beginSession(trainer, mode = 'test') {
   if (current) endSession();
   const now = Date.now();
-  current = { id: newId(), trainer, mode, startedAt: now, updatedAt: now, device: deviceGuess(), times: [], early: 0, answers: [], heard: 0 };
+  current = { id: newId(), trainer, mode, startedAt: now, updatedAt: now, device: deviceGuess(), times: [], early: 0, answers: [], heard: 0, runs: [] };
 }
 
 export function record(result) {
@@ -149,6 +149,7 @@ export function record(result) {
   if (result && result.early) current.early += 1;
   else if (result && result.answer) current.answers.push(result.answer);
   else if (result && result.heard) current.heard += 1;
+  else if (result && result.run) current.runs.push(result.run);
   else if (result && typeof result.ms === 'number' && isFinite(result.ms)) current.times.push(Math.round(result.ms));
   else return;
   current.updatedAt = now;
@@ -164,7 +165,7 @@ export function flushNow() {
   clearTimeout(saveTimer);
   saveTimer = 0;
   if (!worthSaving(current)) return;
-  const s = { ...current, times: [...current.times], answers: [...current.answers] };
+  const s = { ...current, times: [...current.times], answers: [...current.answers], runs: [...current.runs] };
   if (user && cloud) {
     // Not awaited: offline, Firestore queues it and the promise resolves later.
     cloud.save(user.uid, s).catch(err => {
@@ -195,7 +196,7 @@ export async function listSessions(trainer) {
     const prev = byId.get(s.id);
     if (!prev || (s.updatedAt || 0) > (prev.updatedAt || 0)) byId.set(s.id, s);
   }
-  if (worthSaving(current)) byId.set(current.id, { ...current, times: [...current.times], answers: [...current.answers] });
+  if (worthSaving(current)) byId.set(current.id, { ...current, times: [...current.times], answers: [...current.answers], runs: [...current.runs] });
   return [...byId.values()].filter(s => s.trainer === trainer && typeof s.startedAt === 'number');
 }
 

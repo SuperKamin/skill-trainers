@@ -24,6 +24,7 @@ const toDoc = s => ({
   early: s.early || 0,
   answers: s.answers || [],
   heard: s.heard || 0,
+  runs: s.runs || [],
 });
 
 export function connect(config, onUser) {
@@ -88,6 +89,7 @@ export function connect(config, onUser) {
           early: x.early || 0,
           answers: Array.isArray(x.answers) ? x.answers : [],
           heard: x.heard || 0,
+          runs: Array.isArray(x.runs) ? x.runs : [],
         };
       });
     },
