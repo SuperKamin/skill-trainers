@@ -6,7 +6,7 @@ const shortDay = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'sh
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 const DAY = 864e5;
 const mean = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
-const MODE = { test: 'Test', pairs: 'Pairs', clean: 'Clean' };
+const MODE = { test: 'Test', pairs: 'Pairs', clean: 'Clean', learn: 'Learn' };
 
 let shownDevice = null; // remembered while the page is open
 

@@ -308,3 +308,43 @@ kbd {
 .ty-pairs { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; justify-content: center; font-variant-numeric: tabular-nums; color: var(--dim); }
 .ty-pairs b { color: var(--paper); }
 .ty-lens kbd { min-width: 2.4rem; }
+
+/* ---------- Finger keyboard ---------- */
+:root {
+  --f-pinky: #c39bff; --f-ring: #6fa8ff; --f-middle: #5fd4b8; --f-index: #ff9e6b; --f-thumb: #a9a3c7;
+}
+.kb { display: grid; gap: 4px; width: 100%; max-width: 760px; user-select: none; }
+.kb.small { max-width: 620px; gap: 3px; }
+.kb-row { display: flex; gap: 4px; }
+.kb.small .kb-row { gap: 3px; }
+.kb-gap { flex-basis: 0; }
+.kb-key {
+  flex-basis: 0; min-width: 0; height: 2.6rem; border-radius: 7px; border: 1px solid var(--line);
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace; font-size: 0.95rem; color: var(--paper);
+  background: color-mix(in srgb, var(--fc) 22%, var(--card)); padding: 0; position: relative; cursor: default;
+}
+.kb.small .kb-key { height: 2rem; font-size: 0.8rem; border-radius: 5px; }
+.kb.editable .kb-key { cursor: pointer; }
+.kb.editable .kb-key:hover { background: color-mix(in srgb, var(--fc) 45%, var(--card)); }
+.kb-key.changed::after { content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--paper); }
+.kb-key.enter-top { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.kb.focus .kb-key { opacity: 0.35; }
+.kb.focus .kb-key.lit { opacity: 1; background: var(--fc); color: var(--ink); font-weight: 700; box-shadow: 0 0 0 2px var(--paper); }
+.f-LP, .f-RP { --fc: var(--f-pinky); }
+.f-LR, .f-RR { --fc: var(--f-ring); }
+.f-LM, .f-RM { --fc: var(--f-middle); }
+.f-LI, .f-RI { --fc: var(--f-index); }
+.f-TH { --fc: var(--f-thumb); }
+.kb-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.82rem; color: var(--dim); margin-top: 0.8rem; }
+.kb-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--fc); margin-right: 0.35rem; vertical-align: middle; }
+.ty-kb { width: 100%; display: flex; justify-content: center; }
+.kb-sheet {
+  position: fixed; inset: 0; z-index: 10; background: color-mix(in srgb, var(--ink) 80%, transparent);
+  display: grid; place-items: center; padding: 16px; overflow-y: auto;
+}
+.kb-panel { width: 100%; max-width: 820px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 1rem 1.1rem 1.2rem; display: grid; gap: 0.8rem; }
+.kb-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.kb-head h2 { font-family: var(--display); font-weight: 900; font-size: 1.8rem; margin: 0; }
+.kb-pick { display: flex; gap: 0.6rem; align-items: center; color: var(--dim); }
+.kb-pick select { font: inherit; color: var(--paper); background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.5rem; }
+.kb-panel .fine b { color: var(--paper); }

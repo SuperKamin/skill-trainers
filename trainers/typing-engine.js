@@ -23,6 +23,8 @@ const isLetter = c => c >= 'a' && c <= 'z';
  *   onStart()    — first keystroke
  *   onTick({ elapsed, left, wpm, chars }) — about 4×/s while running
  *   onDone(run)  — finished; run = { ms, wpm, raw, acc, chars, fixes, keys, pairs, ended }
+ *   onKey({ want, ok, dt }) — every scored keystroke (dt = ms since the key before, or null)
+ *   onCaret(nextChar)       — whenever the next character to type changes (null at the end)
  * reset(text, marks): marks = Set of character positions to highlight (e.g. the pairs being drilled).
  */
 export function createTyper(el, opts = {}) {
@@ -154,6 +156,7 @@ export function createTyper(el, opts = {}) {
       const dt = added.length === 1 && strokes > 1 ? now - lastKeyAt : null;
       const k = want.toLowerCase();
       if (k !== ' ') bump(keys, k, ok, dt);
+      opts.onKey && opts.onKey({ want, ok, dt });
       const prev = pos > 0 ? target[pos - 1].toLowerCase() : ' ';
       // A letter pair counts when the key before it was typed right.
       if (isLetter(prev) && isLetter(k) && typed[pos - 1] === target[pos - 1]) bump(pairs, prev + k, ok, dt);
@@ -166,6 +169,7 @@ export function createTyper(el, opts = {}) {
 
     if (opts.stopOnError && firstWrong >= 0) { finish('error'); return; }
     if (opts.more && target.length - typed.length < 60) append(opts.more());
+    opts.onCaret && opts.onCaret(target[typed.length] ?? null);
     if (!opts.seconds && !opts.more && typed.length >= target.length) finish('end');
   }
 
@@ -180,6 +184,7 @@ export function createTyper(el, opts = {}) {
       target = text; typed = ''; input.value = ''; marks = markSet || new Set();
       started = 0; done = false; strokes = 0; goodStrokes = 0; fixes = 0; keys = {}; pairs = {};
       render();
+      opts.onCaret && opts.onCaret(target[0] ?? null);
     },
     focus() { input.focus({ preventScroll: true }); },
     get running() { return !!started && !done; },

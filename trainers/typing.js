@@ -3,6 +3,9 @@
 //   test   — the classic test: common words, 15 / 30 / 60 s, speed (WPM) and accuracy.
 //   pairs  — Weak pairs: real words packed with your slowest / most-missed letter pairs.
 //   clean  — Clean run: words keep coming while you're right; the first wrong key ends it.
+//   learn  — Learn the keys: a keyboard under the words lights the next key in its finger's
+//            colour; each key's light fades once you type it fast and right, and comes back
+//            on a miss or a pause (research/fingers.md). Test and Clean run never show it.
 // Principles built into every mode: accuracy and fixes shown next to speed; PC and phone
 // kept apart; compared only with your own usual; short sessions; real words only.
 // Methods (tips you carry anywhere) rotate on screen.
@@ -10,6 +13,13 @@
 import { createTyper, MIN_RUN_CHARS } from './typing-engine.js';
 import { words, pairText } from './typing-words.js';
 import { allRuns, weakKeys } from './typing-history.js';
+import { drawKeyboard, legendHtml, currentLayout, setLayout, detectLayout, codeFor, resetFingers, LAYOUTS } from './keyboard.js';
+
+// Learn the keys: a key counts as learned after 3 fast, right presses in a row.
+const LS_KNOWN = 'skilltrainers.kb.known';
+const FAST_MS = 450, HESITATE_MS = 600, KNOWN_AFTER = 3;
+const readKnown = () => { try { return JSON.parse(localStorage.getItem(LS_KNOWN)) || {}; } catch { return {}; } };
+const saveKnown = k => { try { localStorage.setItem(LS_KNOWN, JSON.stringify(k)); } catch { /* fine */ } };
 
 const LENGTHS = [15, 30, 60];
 const LS_LEN = 'skilltrainers.typing.len';
@@ -60,6 +70,7 @@ export default {
     { id: 'test', name: 'Test', blurb: 'Common words for 15, 30 or 60 seconds.' },
     { id: 'pairs', name: 'Weak pairs', blurb: 'Real words full of the letter pairs that slow you down.' },
     { id: 'clean', name: 'Clean run', blurb: 'Words keep coming while you’re right. One slip ends it.' },
+    { id: 'learn', name: 'Learn the keys', blurb: 'The next key lights up in its finger’s colour, and fades as you learn it.' },
   ],
 
   mount(el, onResult, ctx = {}) {
@@ -71,27 +82,65 @@ export default {
     let len = LENGTHS.includes(readLen()) ? readLen() : 30;
     let focusPairs = null, usingFallback = false;
     let tipIndex = Math.floor(Math.random() * TIPS.length);
+    const onPhone = device === 'phone';
+    let layout = currentLayout();
+    let known = readKnown(), nextCode = null, hesitate = 0, kb = null;
 
     el.innerHTML = `
       <div class="ty">
         <div class="ty-bar">
           <div class="ty-lens" data-lens></div>
           <div class="ty-live"><b data-left></b><span data-wpm></span></div>
+          ${onPhone ? '' : '<button type="button" class="ghost" data-kbbtn>Keyboard</button>'}
         </div>
         <div class="ty-stage" data-stage></div>
+        <div class="ty-kb" data-kb hidden></div>
         <p class="ty-hint" data-hint></p>
         <div class="ty-result" data-result hidden></div>
         <p class="ty-tip" data-tip></p>
+        <div class="kb-sheet" data-sheet hidden></div>
       </div>`;
 
     const $ = s => el.querySelector(s);
     const lens = $('[data-lens]'), left = $('[data-left]'), live = $('[data-wpm]');
     const hint = $('[data-hint]'), result = $('[data-result]'), stage = $('[data-stage]'), tipEl = $('[data-tip]');
+    const kbBox = $('[data-kb]'), sheet = $('[data-sheet]');
+    const showKb = !onPhone && (mode === 'pairs' || mode === 'learn');
+
+    // ---------- the keyboard under the words (Weak pairs + Learn the keys) ----------
+    function drawUnder() {
+      if (!showKb) return;
+      kbBox.hidden = false;
+      kb = drawKeyboard(kbBox, { layout, small: true });
+      if (mode === 'pairs' && focusPairs) kb.light(new Set(focusPairs.join('').split('').map(c => codeFor(layout, c)).filter(Boolean)));
+      if (mode === 'learn') lightNext(false);
+    }
+    function lightNext(force) {
+      if (!kb || mode !== 'learn') return;
+      const learned = nextCode && (known[nextCode] || 0) >= KNOWN_AFTER;
+      kb.light(nextCode && (force || !learned) ? new Set([nextCode]) : new Set());
+    }
 
     const typer = createTyper(stage, {
-      get seconds() { return mode === 'test' ? len : mode === 'pairs' ? PAIRS_SECONDS : null; },
+      get seconds() { return mode === 'test' ? len : mode === 'pairs' ? PAIRS_SECONDS : mode === 'learn' ? 60 : null; },
       get more() { return mode === 'pairs' ? null : () => ' ' + words(40); },
       stopOnError: mode === 'clean',
+      onCaret(ch) {
+        if (mode !== 'learn') return;
+        nextCode = ch == null ? null : codeFor(layout, ch);
+        if (!kb) return;
+        lightNext(false);
+        // A pause brings the light back, even on a key you know.
+        clearTimeout(hesitate);
+        hesitate = setTimeout(() => lightNext(true), HESITATE_MS);
+      },
+      onKey({ want, ok, dt }) {
+        if (mode !== 'learn') return;
+        const code = codeFor(layout, want);
+        if (!code || code === 'Space') return;
+        known[code] = ok && dt != null && dt < FAST_MS ? (known[code] || 0) + 1 : ok ? (known[code] || 0) : 0;
+        saveKnown(known);
+      },
       onStart() { hint.hidden = true; lens.classList.add('dim'); },
       onTick({ left: l, wpm, chars }) {
         left.textContent = l != null ? Math.ceil(l) : '';
@@ -105,6 +154,7 @@ export default {
           const rec = { m: mode, at: Date.now(), ...run };
           if (mode === 'test') rec.len = len;
           if (mode === 'pairs') { rec.len = PAIRS_SECONDS; rec.focus = focusPairs; }
+          if (mode === 'learn') rec.len = 60;
           if (mode === 'clean') rec.words = cleanWords(run);
           done.push(rec);
           onResult({ run: rec });
@@ -118,6 +168,9 @@ export default {
     function startHint() {
       if (mode === 'test') return 'Tap the words (or just start typing). The clock starts on your first key.';
       if (mode === 'clean') return 'Type as cleanly as you can. Words keep coming until the first wrong key.';
+      if (mode === 'learn') return onPhone
+        ? 'The finger keyboard is for a real keyboard. On the phone this is a normal 60-second round.'
+        : 'The next key lights up in the colour of its finger. Once you know a key, its light fades. 60 seconds.';
       return usingFallback
         ? `Not enough of your typing yet to know your pairs, so these are common ones: ${focusPairs.join(' · ')}. After a few tests it uses yours.`
         : `Your slowest pairs right now: ${focusPairs.join(' · ')}. They're marked in the words. ${PAIRS_SECONDS} seconds.`;
@@ -147,6 +200,7 @@ export default {
         typer.reset(words(60));
       }
       drawLens();
+      drawUnder();
       hint.textContent = startHint();
       hint.hidden = false;
       left.textContent = mode === 'test' ? len : mode === 'pairs' ? PAIRS_SECONDS : '';
@@ -180,12 +234,23 @@ export default {
     }
 
     function showResult(run, enough) {
+      clearTimeout(hesitate);
+      kbBox.hidden = true;
       stage.hidden = true;
       hint.hidden = true;
       result.hidden = false;
       const stop = done.length === 5 ? '<p class="ty-usual">That’s 5 runs. Short sessions stick better, so stopping here is a good call.</p>' : '';
       if (!enough) {
         result.innerHTML = `<p class="ty-hint">That was too short to count.</p><button type="button" class="btn go" data-again>Again</button>`;
+      } else if (mode === 'learn') {
+        const n = Object.values(known).filter(v => v >= KNOWN_AFTER).length;
+        result.innerHTML = `
+          <div class="ty-score"><b>${Math.round(run.wpm)}</b><span>wpm</span></div>
+          <div class="ty-sub"><span><b>${Math.round(run.acc * 100)}%</b> accuracy</span><span><b>${n}</b> keys learned</span></div>
+          <p class="ty-usual">A key counts as learned after ${KNOWN_AFTER} fast, right presses in a row. A miss lights it up again.</p>
+          ${stop}
+          <button type="button" class="btn go" data-again>Again</button>
+          <p class="fine">Tab or Enter also starts again.</p>`;
       } else if (mode === 'clean') {
         const w = cleanWords(run);
         result.innerHTML = `
@@ -217,7 +282,43 @@ export default {
       fresh();
     });
 
+    // ---------- the full chart, one tap away ----------
+    function openSheet() {
+      sheet.hidden = false;
+      sheet.innerHTML = `
+        <div class="kb-panel" role="dialog" aria-label="Finger chart">
+          <div class="kb-head">
+            <h2>Which finger for each key</h2>
+            <button type="button" class="ghost" data-close>Close</button>
+          </div>
+          <label class="kb-pick">Keyboard
+            <select id="kb-layout">${Object.entries(LAYOUTS).map(([id, L]) => `<option value="${id}"${id === layout ? ' selected' : ''}>${L.name}</option>`).join('')}</select>
+          </label>
+          <div data-chart></div>
+          ${legendHtml()}
+          <p class="fine">These are the usual fingers. What matters most is using the <b>same</b> finger for a key every time, whichever one it is. Tap a key to change it to the finger you actually use (a dot marks your changes).</p>
+          <button type="button" class="ghost" data-reset>Back to the usual fingers</button>
+        </div>`;
+      const chart = sheet.querySelector('[data-chart]');
+      const draw = () => drawKeyboard(chart, { layout, editable: true, onChange: () => drawUnder() });
+      draw();
+      sheet.querySelector('#kb-layout').addEventListener('change', e => { layout = e.target.value; setLayout(layout); draw(); drawUnder(); });
+      sheet.querySelector('[data-reset]').addEventListener('click', () => { resetFingers(); draw(); drawUnder(); });
+      sheet.querySelector('[data-close]').addEventListener('click', closeSheet);
+      sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+    }
+    function closeSheet() { sheet.hidden = true; sheet.innerHTML = ''; typer.focus(); }
+    const kbBtn = $('[data-kbbtn]');
+    if (kbBtn) kbBtn.addEventListener('click', () => { if (!typer.running) openSheet(); });
+
+    // First time: ask the browser which keyboard is plugged in (Chrome/Edge only).
+    if (!onPhone) {
+      let saved = null; try { saved = localStorage.getItem('skilltrainers.kb.layout'); } catch { /* fine */ }
+      if (!saved) detectLayout().then(id => { if (id && id !== layout) { layout = id; drawUnder(); } });
+    }
+
     function onKey(e) {
+      if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
       if (e.key === 'Tab' || (e.key === 'Enter' && !result.hidden)) { e.preventDefault(); fresh(); }
       else if (e.key === 'Escape') fresh();
     }
@@ -227,6 +328,7 @@ export default {
     fresh();
 
     return function unmount() {
+      clearTimeout(hesitate);
       document.removeEventListener('keydown', onKey);
       typer.destroy();
       el.innerHTML = '';
