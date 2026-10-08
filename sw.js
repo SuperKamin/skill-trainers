@@ -49,7 +49,8 @@ self.addEventListener('activate', event => {
 async function networkFirst(request, fallbackUrl) {
   const cache = await caches.open(CACHE);
   try {
-    const res = await fetch(request);
+    // no-cache: always ask the server if there's something newer (GitHub Pages caches files 10 min).
+    const res = await fetch(request, { cache: 'no-cache' });
     if (res && res.ok) cache.put(request, res.clone());
     return res;
   } catch {
