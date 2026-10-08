@@ -39,8 +39,10 @@ const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' 
  *   seconds      — timed run length (null = untimed)
  *   more()       — returns more text (starting with a space) to append near the end (optional)
  *   stopOnError  — the run ends at the first wrong key (Clean run)
+ *   zen          — no text to copy: whatever you type is the text (all of it counts as right); Shift+Enter ends it
+ *   Untimed with no more(): a word-count test — ends when the last word is right, or on a space after it.
  *   onStart()    — first keystroke
- *   onTick({ elapsed, left, wpm, chars }) — about 4×/s while running
+ *   onTick({ elapsed, left, wpm, chars, words }) — about 4×/s while running (words = words finished)
  *   onDone(run)  — finished; run = { ms, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, ended,
  *                  sec: { wpm[], raw[], err[], burst[] } (one per second), cons (consistency %, or null), ch: { ok, bad, x, miss } }
  *                  burst = speed of the last word finished by that second (space before it → space after it)
@@ -122,6 +124,8 @@ export function createTyper(el, opts = {}) {
       }
       html += `<span class="${cls}">${esc(c < want.length ? want[c] : got[c])}</span>`;
     }
+    // An empty word (zen) still needs a box, so the caret has somewhere to stand.
+    if (!n) html = '<span class="zw">&#8203;</span>';
     const w = wordEls[i];
     w.innerHTML = html;
     w.className = 'w' + (finished && got !== want ? ' err' : '');
@@ -144,16 +148,17 @@ export function createTyper(el, opts = {}) {
     const k = input.selectionDirection === 'backward' ? input.selectionStart : input.selectionEnd;
     const { i, c } = locate(k ?? typed.length);
     const w = wordEls[Math.min(i, wordEls.length - 1)];
-    if (!w || !w.children.length) return;
+    if (!w) return;
     const kids = w.children;
     let x, y, h;
-    if (c < kids.length) { const s = kids[c]; x = s.offsetLeft; y = s.offsetTop; h = s.offsetHeight; }
+    if (!kids.length) { x = w.offsetLeft; y = w.offsetTop; h = w.offsetHeight; }
+    else if (c < kids.length) { const s = kids[c]; x = s.offsetLeft; y = s.offsetTop; h = s.offsetHeight; }
     else { const s = kids[kids.length - 1]; x = s.offsetLeft + s.offsetWidth; y = s.offsetTop; h = s.offsetHeight; }
     caret.style.height = h + 'px';
     caret.style.transform = `translate(${x - 1}px, ${y}px)`;
     // Keep the caret's line as the first or second of the three visible lines.
     const lh = lineHeight();
-    const first = wordEls[0].children[0]?.offsetTop ?? 0;
+    const first = (wordEls[0].children[0] || wordEls[0]).offsetTop;
     const line = Math.round((y - first) / lh);
     textEl.style.transform = `translateY(${-Math.max(0, line - 1) * lh}px)`;
     // What comes next at the caret (for the lit key in Learn the keys).
@@ -166,6 +171,17 @@ export function createTyper(el, opts = {}) {
     for (let i = Math.max(0, fromWord); i <= Math.min(toWord, tw.length - 1); i++) paintWord(i);
     paintSelection();
     placeCaret();
+  }
+
+  /** Zen: the text is whatever was typed, so add / drop word boxes to match. */
+  function syncZen() {
+    target = typed;
+    indexWords();
+    while (wordEls.length > tw.length) {
+      wordEls.pop().remove();
+      if (spEls.length > Math.max(0, wordEls.length - 1)) spEls.pop().remove();
+    }
+    if (wordEls.length < tw.length) addWords(wordEls.length);
   }
 
   function append(text) {
@@ -267,7 +283,7 @@ export function createTyper(el, opts = {}) {
       const t = performance.now(), s = stats(t);
       sample(t);
       const elapsed = (t - started) / 1000;
-      opts.onTick && opts.onTick({ elapsed, left: opts.seconds ? Math.max(0, opts.seconds - elapsed) : null, wpm: s.wpm, chars: s.correct });
+      opts.onTick && opts.onTick({ elapsed, left: opts.seconds ? Math.max(0, opts.seconds - elapsed) : null, wpm: s.wpm, chars: s.correct, words: typedW.length - 1 });
     }, 250);
     if (opts.seconds) timer = setTimeout(() => finish('time'), opts.seconds * 1000);
   }
@@ -276,7 +292,7 @@ export function createTyper(el, opts = {}) {
   function tidy(val) {
     let out = val.replace(/^ +/, '').replace(/ {2,}/g, ' ');
     const ws = out.split(' ');
-    if (ws.length > tw.length) out = ws.slice(0, tw.length).join(' ');
+    if (!opts.zen && ws.length > tw.length) out = ws.slice(0, tw.length).join(' ');
     return out;
   }
 
@@ -284,6 +300,8 @@ export function createTyper(el, opts = {}) {
     if (done) { input.value = typed; return; }
     if (composing) return; // wait until the phone keyboard settles the word
     let val = input.value;
+    const wordTest = !opts.seconds && !opts.more && !opts.zen;
+    const pastEnd = wordTest && val.replace(/^ +/, '').replace(/ {2,}/g, ' ').split(' ').length > tw.length;
     const clean = tidy(val);
     if (clean !== val) {
       const pos = input.selectionStart ?? clean.length;
@@ -291,7 +309,7 @@ export function createTyper(el, opts = {}) {
       input.value = val = clean;
       input.setSelectionRange(p, p);
     }
-    if (val === typed) { paintSelection(); placeCaret(); return; }
+    if (val === typed) { if (pastEnd && started) finish('end'); else { paintSelection(); placeCaret(); } return; }
     const now = performance.now();
     sample(now); // seconds that ended before this key, measured before it lands
 
@@ -309,6 +327,7 @@ export function createTyper(el, opts = {}) {
     const oldWords = typedW.length;
     typed = val;
     typedW = typed.split(' ');
+    if (opts.zen) syncZen();
 
     // Score each new character against the word it landed in.
     let wrong = false;
@@ -348,9 +367,9 @@ export function createTyper(el, opts = {}) {
     draw(locate(p).i - 1, Math.max(oldWords, typedW.length) + 1);
 
     if (opts.stopOnError && wrong) { finish('error'); return; }
-    // Untimed text with an end: done once the last word is typed right.
+    // Word-count test: done once the last word is typed right, or on a space after it.
     const last = tw.length - 1;
-    if (!opts.seconds && !opts.more && typedW.length - 1 === last && typedW[last] === tw[last]) finish('end');
+    if (wordTest && (pastEnd || (typedW.length - 1 === last && typedW[last] === tw[last]))) finish('end');
   }
 
   input.addEventListener('input', onInput);
@@ -364,7 +383,11 @@ export function createTyper(el, opts = {}) {
     if (a === 0 || typed[a - 1] === ' ' || typed[a] === ' ') e.preventDefault();
   });
   // Enter does nothing while typing. Every other key (arrows, Ctrl, Shift, Delete…) is the text box's own.
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (opts.zen && e.shiftKey) finish('end');
+  });
   // Moving the caret / selecting doesn't change the text, so redraw on those too.
   const onSel = () => { if (document.activeElement === input && !done) { paintSelection(); placeCaret(); } };
   document.addEventListener('selectionchange', onSel);

@@ -7,8 +7,18 @@ const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2
 const DAY = 864e5;
 const mean = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 const MODE = { test: 'Test', pairs: 'Pairs', clean: 'Clean', learn: 'Learn' };
+const PACK_NAME = { en: 'English', pt: 'Português', gd: 'GDScript', mcf: 'mcfunction' };
 
 let shownDevice = null; // remembered while the page is open
+let shownGroup = null;  // which kind of test the graph shows
+
+/** Tests are graphed per group: kind (time / words / zen) + pack + switches. Lengths share a graph. */
+const groupKey = r => (r.kind === 'zen' ? 'zen|-|00' : `${r.kind || 'time'}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
+function groupLabel(key) {
+  const [kind, pack, f] = key.split('|');
+  return [kind === 'time' ? 'Time' : kind === 'words' ? 'Words' : 'Zen', kind === 'zen' ? '' : PACK_NAME[pack] || pack,
+    f[0] === '1' ? 'punctuation' : '', f[1] === '1' ? 'numbers' : ''].filter(Boolean).join(' · ');
+}
 
 /** Every run, oldest first, with its session's device. */
 export function allRuns(sessions) {
@@ -44,15 +54,19 @@ export function renderTypingHistory(el, sessions, source) {
 
   const draw = () => {
     const mine = runs.filter(r => r.device === shownDevice);
-    const tests = mine.filter(r => (r.m || 'test') === 'test');
+    const allTests = mine.filter(r => (r.m || 'test') === 'test');
+    const groups = [...new Set(allTests.map(groupKey))];
+    if (!groups.includes(shownGroup)) shownGroup = allTests.length ? groupKey(allTests[allTests.length - 1]) : null;
+    const tests = allTests.filter(r => groupKey(r) === shownGroup);
+    const unit = (shownGroup || '').startsWith('words') ? 'words' : 's';
     const now = Date.now();
     const last7 = mean(tests.filter(r => r.at >= now - 7 * DAY).map(r => r.wpm));
     const prev7 = mean(tests.filter(r => r.at >= now - 14 * DAY && r.at < now - 7 * DAY).map(r => r.wpm));
     const best = tests.length ? Math.max(...tests.map(r => r.wpm)) : null;
     const accAvg = mean(tests.slice(-10).map(r => r.acc));
     const consAvg = mean(tests.filter(r => r.cons != null).slice(-10).map(r => r.cons));
-    const bestBy = [15, 30, 60].map(l => { const w = tests.filter(r => r.len === l).map(r => r.wpm); return { l, w: w.length ? Math.max(...w) : null }; })
-      .filter(b => b.w != null);
+    const bestBy = [...new Set(tests.map(r => r.len).filter(Boolean))].sort((a, b) => a - b)
+      .map(l => ({ l, w: Math.max(...tests.filter(r => r.len === l).map(r => r.wpm)) }));
     const wk = weakKeys(mine.slice(-30));
     const byErr = [...wk].sort((a, b) => b.err - a.err).filter(x => x.err > 0).slice(0, 6);
     const bySlow = [...wk].filter(x => x.ms).sort((a, b) => b.ms - a.ms).slice(0, 6);
@@ -61,6 +75,7 @@ export function renderTypingHistory(el, sessions, source) {
     el.innerHTML = `
       ${devices.length > 1 ? `<div class="ty-devs">${devices.map(d =>
         `<button type="button" class="chip${d === shownDevice ? ' on' : ''}" data-dev="${d}">${d === 'pc' ? 'PC' : 'Phone'}</button>`).join('')}</div>` : ''}
+      ${groups.length > 1 ? `<label class="ty-group">Graph: <select data-group>${groups.map(g => `<option value="${g}"${g === shownGroup ? ' selected' : ''}>${groupLabel(g)}</option>`).join('')}</select></label>` : ''}
       ${tests.length ? `<section class="card chart-card"><div class="chart" data-chart role="img" aria-label="Words per minute per test"></div></section>` : ''}
       <section class="tiles">
         <div class="tile"><span class="label">Best</span><b>${fmt(best)}<small> wpm</small></b></div>
@@ -68,7 +83,7 @@ export function renderTypingHistory(el, sessions, source) {
         ${consAvg != null ? `<div class="tile"><span class="label">Consistency</span><b>${Math.round(consAvg)}%</b></div>` : ''}
         <div class="tile"><span class="label">Tests</span><b>${tests.length}</b></div>
       </section>
-      ${bestBy.length > 1 ? `<p class="week">Best by length: ${bestBy.map(b => `${b.l} s <b>${Math.round(b.w)}</b>`).join(' · ')}</p>` : ''}
+      ${bestBy.length > 1 ? `<p class="week">Best by length: ${bestBy.map(b => `${b.l} ${unit} <b>${Math.round(b.w)}</b>`).join(' · ')}</p>` : ''}
       <p class="week">Last 7 days: <b>${fmt(last7)} wpm</b> · week before: <b>${fmt(prev7)} wpm</b>${devices.length > 1 ? ` · on ${shownDevice === 'pc' ? 'PC' : 'phone'}` : ''}</p>
 
       ${byErr.length || bySlow.length ? `
@@ -85,16 +100,17 @@ export function renderTypingHistory(el, sessions, source) {
           ${mine.slice().reverse().slice(0, 50).map(r => `
             <li class="sess-row">
               <span class="when">${dayFmt.format(r.at)}<small>${timeFmt.format(r.at)}</small></span>
-              <span>${MODE[r.m || 'test'] || r.m}</span>
-              <span class="num">${r.m === 'clean' ? (r.words || 0) + ' w' : r.len ? r.len + ' s' : ''}</span>
+              <span>${(r.m || 'test') === 'test' && r.kind === 'zen' ? 'Zen' : MODE[r.m || 'test'] || r.m}${r.pack && r.pack !== 'en' ? `<small>${PACK_NAME[r.pack] || r.pack}</small>` : ''}</span>
+              <span class="num">${r.m === 'clean' ? (r.words || 0) + ' w' : r.kind === 'words' ? r.len + ' w' : r.len ? r.len + ' s' : ''}</span>
               <span class="num">${Math.round(r.wpm)}</span>
               <span class="num">${Math.round(r.acc * 100)}%</span>
             </li>`).join('')}
         </ol>
       </section>
-      <p class="fine">${source} WPM counts correct characters only (5 characters = 1 word). The graph shows Test runs; Pairs and Clean runs are practice and only appear in the list.</p>`;
+      <p class="fine">${source} WPM counts correct characters only (5 characters = 1 word). The graph shows one kind of Test at a time (pick it above the graph); Pairs and Clean runs are practice and only appear in the list.</p>`;
 
     el.querySelectorAll('[data-dev]').forEach(b => b.addEventListener('click', () => { shownDevice = b.dataset.dev; draw(); }));
+    el.querySelector('[data-group]')?.addEventListener('change', e => { shownGroup = e.target.value; draw(); });
     const box = el.querySelector('[data-chart]');
     if (box) drawChart(box, chart(tests, box.clientWidth || 340));
   };
@@ -103,6 +119,8 @@ export function renderTypingHistory(el, sessions, source) {
 }
 
 const MODE_LONG = { test: 'test', pairs: 'Weak pairs', clean: 'Clean run', learn: 'Learn the keys' };
+const runLabel = r => (r.kind === 'zen' ? 'zen' : r.kind === 'words' ? `${r.len} words` : `${r.len} s ${MODE_LONG[r.m || 'test']}`)
+  + (r.pack && r.pack !== 'en' ? ` · ${PACK_NAME[r.pack] || r.pack}` : '') + (r.p ? ' · punctuation' : '') + (r.n ? ' · numbers' : '');
 
 /** History: one dot per Test run. Hover/tap a dot for how that run went. */
 function chart(rows, W) {
@@ -143,7 +161,7 @@ function chart(rows, W) {
       ['raw', 'raw', r.raw != null ? Math.round(r.raw) : null],
       ['acc', 'accuracy', Math.round(r.acc * 100) + '%'],
       ['cons', 'consistency', r.cons != null ? r.cons + '%' : null],
-    ], `${r.len} s ${MODE_LONG[r.m || 'test']}`),
+    ], runLabel(r)),
   }));
   return { html: out.join(''), W, top: m.t, bottom: H - m.b, pts };
 }

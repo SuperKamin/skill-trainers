@@ -10,7 +10,7 @@ Plain static files, no build step, hosted on GitHub Pages: **pushing to `main` i
 |---|---|---|
 | **Reaction** | one mode (the test) | `research/reaction.md` (6 practice modes suggested, none built yet) |
 | **Notes** (name a note against C) | Test · Easy · Twin notes · Listen | `research/notes.md` |
-| **Typing** | Test · Weak pairs · Clean run · Learn the keys | `research/typing.md`, `research/fingers.md` |
+| **Typing** | Test (time / words / zen · packs · punctuation / numbers) · Weak pairs · Clean run · Learn the keys | `research/typing.md`, `research/fingers.md` |
 | *Memory* (next candidate) | — | `research/memory.md` (recommends "Number Climb" first) |
 
 ## How a trainer is made (the recipe, from Leo — 04/10)
@@ -41,6 +41,7 @@ trainers/index.js        the list of trainers on Home
 trainers/reaction.js     Reaction
 trainers/notes*.js       Notes: game, audio (Web Audio synth), logic (unlocks, mix-ups), history
 trainers/typing*.js      Typing: trainer, engine (input + measuring), words, history
+trainers/packs/*.js      Typing word packs (English, Português, GDScript, mcfunction); add one = new file + list it in packs/index.js
 trainers/keyboard.js     finger keyboard: 8 layouts (ABNT2, US, UK, PT, DE, FR, Dvorak, Colemak), finger map, editable chart
 sw.js                    offline cache: the app's own files are network-first (updates show on next open)
 manifest.webmanifest     install info; icon-*.png, apple-touch-icon.png (tools/make_icons.py redraws them)
@@ -75,7 +76,7 @@ Account: `users/{uid}/sessions/{sessionId}` = `{ trainer, mode, startedAt, updat
 
 - Reaction: `times` (ms; taps under 80 ms never count), `early`.
 - Notes: `answers` = `{ t: played, a: answered, ok, ms, o: octave, tb: timbre, p?: practice }`. Unlocks are worked out from the answers, never stored.
-- Typing: `runs` = `{ m: mode, at, len?, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, focus?, words?, sec?, cons?, ch? }`; since stage 2: `sec` = `{ wpm[], raw[], err[], burst[] }` one per second (cumulative wpm, raw that second, wrong keys that second, speed of the last word finished by then: space before it → space after it), `cons` = consistency % (Monkeytype's formula on `sec.raw`), `ch` = `{ ok, bad, x, miss }` letters right/wrong/extra/missed. Both typing charts (result + History) have a Monkeytype-style hover/tap box (`drawChart` in `typing-history.js`): a line at the nearest point + its numbers. Personal best (result screen) = best wpm per Test length, or most clean words, same device only; it only ever adds; `keys`/`pairs` = `[times, mistakes, ms total, timed count]`.
+- Typing: `runs` = `{ m: mode, at, len?, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, focus?, words?, sec?, cons?, ch? }`; since stage 2: `sec` = `{ wpm[], raw[], err[], burst[] }` one per second (cumulative wpm, raw that second, wrong keys that second, speed of the last word finished by then: space before it → space after it), `cons` = consistency % (Monkeytype's formula on `sec.raw`), `ch` = `{ ok, bad, x, miss }` letters right/wrong/extra/missed. Both typing charts (result + History) have a Monkeytype-style hover/tap box (`drawChart` in `typing-history.js`): a line at the nearest point + its numbers. Test runs also save `kind` (time / words / zen), `len` (seconds or word count; none for zen), `pack` (not for zen), `p` / `n` (punctuation / numbers, only when on). Bests and "your usual" compare only the same kind of test (`testKey` in `typing.js`); History graphs one group at a time (kind + pack + switches). Weak pairs only learns from English runs. Personal best (result screen) = best wpm per Test length, or most clean words, same device only; it only ever adds; `keys`/`pairs` = `[times, mistakes, ms total, timed count]`.
 - Typing engine (`typing-engine.js`): the hidden `<input>` is the source of truth, so all text-box keys work (Ctrl+Backspace, Delete, arrows, Ctrl/Shift+arrows, typing over a selection, inserting mid-text); the screen just draws its text, caret and selection. Monkeytype-style words: typed word *i* lines up with target word *i*; space jumps on; extra letters shown, unfinished/wrong words underlined, missing letters marked. Timing (`keys`, `pairs`) only counts keys added at the end; any edit further back is a fix. Focus mode (`body.ty-focus`) fades everything but the words + counter while typing; mouse move brings it back. Plan for the rest: `plans/typing-monkeytype.md`.
 
 ## Testing locally

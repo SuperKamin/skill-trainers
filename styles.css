@@ -206,7 +206,7 @@ a { touch-action: manipulation; }
 }
 .sess-row > span:nth-child(n+3) { text-align: right; }
 .sess-head { font-size: 0.7rem; border-bottom-color: var(--dim); padding-bottom: 0.4rem; }
-.sess-row .when small { display: block; color: var(--dim); font-size: 0.8rem; }
+.sess-row .when small, .sess-row span small { display: block; color: var(--dim); font-size: 0.8rem; }
 .sess-row > span:nth-child(2) { color: var(--dim); font-size: 0.9rem; }
 .empty { font-size: 1.15rem; color: var(--dim); margin: 2rem 0 1rem; max-width: 32ch; }
 .loading { color: var(--dim); margin: 2rem 0; }
@@ -291,7 +291,14 @@ a { touch-action: manipulation; }
   background: var(--ink); overflow-y: auto;
 }
 .ty-bar { width: 100%; max-width: 760px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.ty-lens { display: flex; gap: 0.4rem; transition: opacity 0.2s; }
+.ty-lens { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.9rem; transition: opacity 0.2s; }
+.ty-seg { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.ty-pack, .ty-group select {
+  background: var(--card); color: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.35rem 0.8rem; font: inherit; font-size: 0.9rem; min-height: 36px;
+}
+.ty-group { display: flex; align-items: center; gap: 0.5rem; color: var(--dim); margin-bottom: 0.6rem; }
+.ty-live [data-done] { margin-left: 0.6rem; }
 .ty-lens.dim { opacity: 0.25; pointer-events: none; }
 .ty-live { font-variant-numeric: tabular-nums; color: var(--dim); }
 .ty-live b { font-family: var(--display); font-weight: 900; font-size: 2rem; color: var(--go); }
@@ -302,6 +309,8 @@ a { touch-action: manipulation; }
   font-family: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: clamp(1.15rem, 4.6vw, 1.6rem); line-height: 2.6rem; color: var(--dim);
   word-break: normal; overflow-wrap: break-word; transition: transform 0.12s ease-out;
+  white-space: pre-wrap; /* keep a space at the end of a line, so the caret can stand after it */
+  font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; /* show <= -> != as typed, not joined */
 }
 .ty-text .l { opacity: 0.6; }
 .ty-text .l.ok { color: var(--paper); opacity: 1; }
