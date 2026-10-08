@@ -42,7 +42,8 @@ const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' 
  *   onStart()    — first keystroke
  *   onTick({ elapsed, left, wpm, chars }) — about 4×/s while running
  *   onDone(run)  — finished; run = { ms, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, ended,
- *                  sec: { wpm[], raw[], err[] } (one per second), cons (consistency %, or null), ch: { ok, bad, x, miss } }
+ *                  sec: { wpm[], raw[], err[], burst[] } (one per second), cons (consistency %, or null), ch: { ok, bad, x, miss } }
+ *                  burst = speed of the last word finished by that second (space before it → space after it)
  *   onKey({ want, ok, dt }) — every scored keystroke at the end of the text (dt = ms since the key before, or null)
  *   onCaret(nextChar)       — whenever the next character to type changes (null at the end)
  * reset(text, marks): marks = Set of character positions in text to highlight (e.g. the pairs being drilled).
@@ -67,7 +68,7 @@ export function createTyper(el, opts = {}) {
   let keys = {}, pairs = {};
   let lastNext;
   // Second by second: cumulative wpm at the end of each second, and keys / wrong keys typed in it.
-  let secWpm = [], secKeys = [], secErr = [];
+  let secWpm = [], secKeys = [], secErr = [], secBurst = [], wordFrom = 0;
 
   const bump = (map, k, ok, dt) => {
     const r = map[k] || (map[k] = [0, 0, 0, 0]);
@@ -229,6 +230,13 @@ export function createTyper(el, opts = {}) {
       raw.push(Math.round(wpmOf(k, len)));
       err.push(e);
     }
+    // Burst: the last word finished by each second (carried on through seconds with no word finished).
+    const burst = [];
+    let lastBurst = 0;
+    for (let b = 0; b < n; b++) {
+      for (let q = b; q < (b === n - 1 ? secBurst.length : b + 1); q++) if (secBurst[q] != null) lastBurst = secBurst[q];
+      burst.push(lastBurst);
+    }
     // Whole words right before the first wrong one (for Clean run).
     let wordsClean = 0;
     while (wordsClean < typedW.length && typedW[wordsClean] === tw[wordsClean] &&
@@ -245,14 +253,14 @@ export function createTyper(el, opts = {}) {
       keys,
       pairs,
       ended,
-      sec: { wpm: secWpm.slice(0, n), raw, err },
+      sec: { wpm: secWpm.slice(0, n), raw, err, burst },
       cons: consistency(raw),
       ch: letters(),
     });
   }
 
   function begin(now) {
-    started = now; lastKeyAt = now;
+    started = now; lastKeyAt = now; wordFrom = now;
     caret.classList.remove('idle');
     opts.onStart && opts.onStart();
     tick = setInterval(() => {
@@ -318,6 +326,12 @@ export function createTyper(el, opts = {}) {
       secKeys[b] = (secKeys[b] || 0) + 1;
       if (!ok) secErr[b] = (secErr[b] || 0) + 1;
       if (!atEnd) continue; // edits further back: no timing, no key/pair stats
+      if (ch === ' ') {
+        // A word finished at the end: its burst speed, from the space before it to this one.
+        const ms = now - wordFrom;
+        if (ms > 0 && typedW[i].length) secBurst[b] = Math.round(wpmOf(typedW[i].length + 1, ms));
+        wordFrom = now;
+      }
       // Only single keystrokes give a fair time (a pasted/autocorrected chunk doesn't).
       const dt = added.length === 1 && strokes > 1 ? now - lastKeyAt : null;
       if (want == null) continue; // an extra letter: counted wrong above, no key to blame
@@ -366,7 +380,7 @@ export function createTyper(el, opts = {}) {
       clearInterval(tick); clearTimeout(timer);
       target = text; typed = ''; typedW = ['']; input.value = ''; marks = markSet || new Set();
       started = 0; done = false; strokes = 0; goodStrokes = 0; fixes = 0; keys = {}; pairs = {};
-      secWpm = []; secKeys = []; secErr = [];
+      secWpm = []; secKeys = []; secErr = []; secBurst = []; wordFrom = 0;
       lastNext = undefined;
       textEl.querySelectorAll('.w, .sp').forEach(n => n.remove());
       wordEls = []; spEls = [];

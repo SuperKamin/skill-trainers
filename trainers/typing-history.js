@@ -96,12 +96,15 @@ export function renderTypingHistory(el, sessions, source) {
 
     el.querySelectorAll('[data-dev]').forEach(b => b.addEventListener('click', () => { shownDevice = b.dataset.dev; draw(); }));
     const box = el.querySelector('[data-chart]');
-    if (box) box.innerHTML = chart(tests, box.clientWidth || 340);
+    if (box) drawChart(box, chart(tests, box.clientWidth || 340));
   };
   draw();
   return draw;
 }
 
+const MODE_LONG = { test: 'test', pairs: 'Weak pairs', clean: 'Clean run', learn: 'Learn the keys' };
+
+/** History: one dot per Test run. Hover/tap a dot for how that run went. */
 function chart(rows, W) {
   const H = W < 520 ? 200 : 250;
   const m = { l: 40, r: 12, t: 24, b: 26 };
@@ -131,15 +134,25 @@ function chart(rows, W) {
     out.push(`<polyline class="trend" points="${rows.map((r, i) => `${x(r.at).toFixed(1)},${y(trend[i]).toFixed(1)}`).join(' ')}"/>`);
   }
   const rad = rows.length > 80 ? 2.6 : 3.6;
-  rows.forEach((r, i) => out.push(`<circle class="avg" cx="${x(r.at).toFixed(1)}" cy="${y(v[i]).toFixed(1)}" r="${rad}"><title>${dayFmt.format(r.at)} ${timeFmt.format(r.at)} · ${Math.round(r.wpm)} wpm · ${Math.round(r.acc * 100)}% · ${r.len} s</title></circle>`));
+  rows.forEach((r, i) => out.push(`<circle class="avg" cx="${x(r.at).toFixed(1)}" cy="${y(v[i]).toFixed(1)}" r="${rad}"/>`));
   out.push('</svg>');
-  return out.join('');
+  const pts = rows.map((r, i) => ({
+    x: x(r.at), y: y(v[i]),
+    html: tipHtml(`${dayFmt.format(r.at)} · ${timeFmt.format(r.at)}`, [
+      ['wpm', 'wpm', Math.round(r.wpm)],
+      ['raw', 'raw', r.raw != null ? Math.round(r.raw) : null],
+      ['acc', 'accuracy', Math.round(r.acc * 100) + '%'],
+      ['cons', 'consistency', r.cons != null ? r.cons + '%' : null],
+    ], `${r.len} s ${MODE_LONG[r.m || 'test']}`),
+  }));
+  return { html: out.join(''), W, top: m.t, bottom: H - m.b, pts };
 }
 
-/** One run, second by second: wpm (bright line), raw (faint line), and a red × on seconds with mistakes. */
+/** One run, second by second: wpm (bright line), raw (faint line), and a red × on seconds with mistakes.
+ *  Hover/tap a second for errors, wpm, raw and burst at that moment. */
 export function runChart(run, W) {
   const sec = run.sec;
-  if (!sec || !sec.wpm || sec.wpm.length < 2) return '';
+  if (!sec || !sec.wpm || sec.wpm.length < 2) return null;
   const N = sec.wpm.length;
   const H = W < 520 ? 170 : 210;
   const m = { l: 40, r: 12, t: 24, b: 24 };
@@ -162,12 +175,64 @@ export function runChart(run, W) {
   }
   const line = a => a.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   out.push(`<polyline class="raw" points="${line(sec.raw)}"/>`, `<polyline class="trend" points="${line(sec.wpm)}"/>`);
-  sec.wpm.forEach((v, i) => out.push(`<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="6"><title>${i + 1} s · ${v} wpm · ${sec.raw[i]} raw${sec.err[i] ? ` · ${sec.err[i]} wrong` : ''}</title></circle>`));
   sec.err.forEach((e, i) => {
     if (!e) return;
     const cx = x(i), cy = y(sec.raw[i]) - 9, r = e > 2 ? 4.5 : 3.5;
-    out.push(`<path class="errm" d="M${(cx - r).toFixed(1)},${(cy - r).toFixed(1)}L${(cx + r).toFixed(1)},${(cy + r).toFixed(1)}M${(cx + r).toFixed(1)},${(cy - r).toFixed(1)}L${(cx - r).toFixed(1)},${(cy + r).toFixed(1)}"><title>${i + 1} s · ${e} wrong</title></path>`);
+    out.push(`<path class="errm" d="M${(cx - r).toFixed(1)},${(cy - r).toFixed(1)}L${(cx + r).toFixed(1)},${(cy + r).toFixed(1)}M${(cx + r).toFixed(1)},${(cy - r).toFixed(1)}L${(cx - r).toFixed(1)},${(cy + r).toFixed(1)}"/>`);
   });
   out.push('</svg>');
-  return out.join('');
+  const pts = sec.wpm.map((v, i) => ({
+    x: x(i), y: y(v),
+    html: tipHtml(`${i + 1}`, [
+      ['err', 'errors', sec.err[i] || 0],
+      ['wpm', 'wpm', v],
+      ['raw', 'raw', sec.raw[i]],
+      ['burst', 'burst', sec.burst ? sec.burst[i] : null],
+    ]),
+  }));
+  return { html: out.join(''), W, top: m.t, bottom: H - m.b, pts };
+}
+
+function tipHtml(head, rows, foot) {
+  return `<b class="tip-head">${head}</b>${rows.filter(r => r[2] != null)
+    .map(([k, label, val]) => `<span class="tip-row"><i class="sw-${k}"></i>${label}: <b>${val}</b></span>`).join('')}${foot ? `<small>${foot}</small>` : ''}`;
+}
+
+/** Puts a chart in its box and adds the hover/tap box: a line at the nearest point + its numbers. */
+export function drawChart(box, c) {
+  if (!c) { box.innerHTML = ''; return; }
+  box.innerHTML = c.html;
+  box.classList.add('has-tip');
+  const svg = box.querySelector('svg');
+  const NS = 'http://www.w3.org/2000/svg';
+  const guide = document.createElementNS(NS, 'line');
+  guide.setAttribute('class', 'guide');
+  guide.setAttribute('y1', c.top); guide.setAttribute('y2', c.bottom);
+  const dot = document.createElementNS(NS, 'circle');
+  dot.setAttribute('class', 'hover-dot'); dot.setAttribute('r', '5');
+  svg.append(guide, dot);
+  const tip = document.createElement('div');
+  tip.className = 'chart-tip';
+  box.appendChild(tip);
+  const hide = () => box.classList.remove('tipping');
+  const show = e => {
+    const r = svg.getBoundingClientRect();
+    const k = r.width / c.W;
+    const sx = (e.clientX - r.left) / k;
+    let best = c.pts[0];
+    for (const p of c.pts) if (Math.abs(p.x - sx) < Math.abs(best.x - sx)) best = p;
+    guide.setAttribute('x1', best.x); guide.setAttribute('x2', best.x);
+    dot.setAttribute('cx', best.x); dot.setAttribute('cy', best.y);
+    tip.innerHTML = best.html;
+    box.classList.add('tipping');
+    const px = best.x * k + (r.left - box.getBoundingClientRect().left);
+    const w = tip.offsetWidth;
+    tip.style.left = `${px + 14 + w > box.clientWidth ? Math.max(0, px - 14 - w) : px + 14}px`;
+    tip.style.top = `${c.top * k}px`;
+  };
+  svg.addEventListener('pointermove', show);
+  svg.addEventListener('pointerdown', show);
+  svg.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hide(); });
+  // On the phone the box stays until you tap somewhere else.
+  document.addEventListener('pointerdown', e => { if (!box.contains(e.target)) hide(); }, { capture: true });
 }

@@ -12,7 +12,7 @@
 
 import { createTyper, MIN_RUN_CHARS } from './typing-engine.js';
 import { words, pairText } from './typing-words.js';
-import { allRuns, weakKeys, runChart } from './typing-history.js';
+import { allRuns, weakKeys, runChart, drawChart } from './typing-history.js';
 import { drawKeyboard, legendHtml, currentLayout, setLayout, detectLayout, codeFor, resetFingers, LAYOUTS } from './keyboard.js';
 
 // Learn the keys: a key counts as learned after 3 fast, right presses in a row.
@@ -315,7 +315,7 @@ export default {
       }
       result.querySelector('[data-again]').addEventListener('click', fresh);
       const rc = result.querySelector('[data-runchart]');
-      if (rc) rc.innerHTML = runChart(run, Math.round(rc.clientWidth) || 340);
+      if (rc) drawChart(rc, runChart(run, Math.round(rc.clientWidth) || 340));
     }
 
     lens.addEventListener('click', e => {
