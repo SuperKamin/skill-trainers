@@ -141,13 +141,14 @@ export default {
         known[code] = ok && dt != null && dt < FAST_MS ? (known[code] || 0) + 1 : ok ? (known[code] || 0) : 0;
         saveKnown(known);
       },
-      onStart() { hint.hidden = true; lens.classList.add('dim'); },
+      onStart() { hint.hidden = true; lens.classList.add('dim'); setFocus(true); },
       onTick({ left: l, wpm, chars }) {
         left.textContent = l != null ? Math.ceil(l) : '';
         live.textContent = mode === 'clean' ? `${Math.round(wpm)} wpm · ${chars} clean` : ` · ${Math.round(wpm)} wpm`;
       },
       onDone(run) {
         lens.classList.remove('dim');
+        setFocus(false);
         left.textContent = ''; live.textContent = '';
         const enough = run.chars >= MIN_RUN_CHARS || (mode === 'clean' && run.chars > 0);
         if (enough) {
@@ -163,6 +164,12 @@ export default {
         showResult(run, enough);
       },
     });
+
+    // ---------- focus mode: while typing, everything but the words and the counter fades ----------
+    function setFocus(on) { document.body.classList.toggle('ty-focus', on); }
+    // Moving the mouse brings everything back; the next key hides it again.
+    const onMouse = e => { if (e.movementX || e.movementY) setFocus(false); };
+    document.addEventListener('mousemove', onMouse);
 
     // ---------- what each mode shows before you start ----------
     function startHint() {
@@ -188,6 +195,7 @@ export default {
     }
 
     function fresh() {
+      setFocus(false);
       result.hidden = true;
       stage.hidden = false;
       if (mode === 'pairs') {
@@ -319,6 +327,7 @@ export default {
 
     function onKey(e) {
       if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
+      if (typer.running && e.key !== 'Escape' && e.key !== 'Tab') setFocus(true);
       if (e.key === 'Tab' || (e.key === 'Enter' && !result.hidden)) { e.preventDefault(); fresh(); }
       else if (e.key === 'Escape') fresh();
     }
@@ -330,6 +339,8 @@ export default {
     return function unmount() {
       clearTimeout(hesitate);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousemove', onMouse);
+      setFocus(false);
       typer.destroy();
       el.innerHTML = '';
     };

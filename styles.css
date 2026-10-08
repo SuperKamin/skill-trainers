@@ -273,14 +273,24 @@ a { touch-action: manipulation; }
 .ty-stage { width: 100%; max-width: 760px; position: relative; }
 .ty-box { height: calc(3 * 2.6rem); overflow: hidden; cursor: text; outline: none; }
 .ty-text {
+  position: relative;
   font-family: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: clamp(1.15rem, 4.6vw, 1.6rem); line-height: 2.6rem; color: var(--dim); opacity: 0.75;
+  font-size: clamp(1.15rem, 4.6vw, 1.6rem); line-height: 2.6rem; color: var(--dim);
   word-break: normal; overflow-wrap: break-word; transition: transform 0.12s ease-out;
 }
-.ty-text span.ok { color: var(--paper); opacity: 1; }
-.ty-text span.bad { color: var(--miss); opacity: 1; text-decoration: underline; text-decoration-thickness: 2px; }
-.ty-text span.sp.bad { background: color-mix(in srgb, var(--miss) 45%, transparent); text-decoration: none; }
-.ty-text span.caret { box-shadow: -2px 0 0 var(--go); }
+.ty-text .l { opacity: 0.6; }
+.ty-text .l.ok { color: var(--paper); opacity: 1; }
+.ty-text .l.bad { color: var(--miss); opacity: 1; }
+.ty-text .l.x { color: color-mix(in srgb, var(--miss) 60%, var(--ink)); opacity: 1; }
+.ty-text .w.err { text-decoration: underline; text-decoration-color: var(--miss); text-decoration-thickness: 2px; text-underline-offset: 6px; }
+.ty-text .sel { background: color-mix(in srgb, var(--go) 35%, transparent); border-radius: 2px; }
+.ty-caret {
+  position: absolute; left: 0; top: 0; width: 2px; border-radius: 1px; background: var(--go);
+  pointer-events: none; transition: transform 0.09s ease-out;
+}
+.ty-caret.idle { animation: ty-blink 1s step-end infinite; }
+@keyframes ty-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ty-caret, .ty-text { transition: none; } }
 .ty-input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
 .ty-hint { color: var(--dim); text-align: center; max-width: 36ch; margin: 0; }
 .ty-result { display: grid; justify-items: center; gap: 0.9rem; text-align: center; }
@@ -300,9 +310,14 @@ kbd {
 .ty-weak small { color: var(--dim); font-variant-numeric: tabular-nums; margin-left: 0.2rem; }
 .tile b small { font-size: 0.5em; color: var(--dim); }
 
-.ty-text span.mk { color: var(--go); opacity: 0.9; }
-.ty-text span.mk.ok { color: var(--go); }
+.ty-text .l.mk { color: var(--go); opacity: 0.9; }
+.ty-text .l.mk.ok { color: var(--go); opacity: 1; }
+.ty-text .l.mk.bad { color: var(--miss); }
 .ty-tip { color: var(--dim); font-size: 0.85rem; text-align: center; max-width: 40ch; margin: auto 0 0; }
+/* Focus mode: while typing, only the words and the live counter stay. Mouse move brings the rest back. */
+.play-top, .ty-lens, .ty-bar .ghost, .ty-tip, .ty-hint { transition: opacity 0.25s; }
+body.ty-focus .play-top, body.ty-focus .ty-lens, body.ty-focus .ty-bar .ghost, body.ty-focus .ty-tip, body.ty-focus .ty-hint { opacity: 0; pointer-events: none; }
+body.ty-focus { cursor: none; }
 .ty-usual { color: var(--dim); margin: 0; font-variant-numeric: tabular-nums; }
 .ty-usual b { color: var(--paper); }
 .ty-pairs { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; justify-content: center; font-variant-numeric: tabular-nums; color: var(--dim); }
@@ -337,7 +352,7 @@ kbd {
 .f-TH { --fc: var(--f-thumb); }
 .kb-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.82rem; color: var(--dim); margin-top: 0.8rem; }
 .kb-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--fc); margin-right: 0.35rem; vertical-align: middle; }
-.ty-kb { width: 100%; display: flex; justify-content: center; }
+.ty-kb { width: 100%; }
 .kb-sheet {
   position: fixed; inset: 0; z-index: 10; background: color-mix(in srgb, var(--ink) 80%, transparent);
   display: grid; place-items: center; padding: 16px; overflow-y: auto;
