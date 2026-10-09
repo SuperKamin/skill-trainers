@@ -299,6 +299,11 @@ a { touch-action: manipulation; }
 }
 .ty-group { display: flex; align-items: center; gap: 0.5rem; color: var(--dim); margin-bottom: 0.6rem; }
 .ty-live [data-done] { margin-left: 0.6rem; }
+.ty-tools { display: flex; gap: 0.2rem; }
+.kb-panel.snd-panel { max-width: 480px; }
+.snd-row { display: flex; align-items: center; gap: 0.7rem; color: var(--dim); }
+.snd-row input[type="range"] { flex: 1; accent-color: var(--go); }
+.snd-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--go); }
 .ty-lens.dim { opacity: 0.25; pointer-events: none; }
 .ty-live { font-variant-numeric: tabular-nums; color: var(--dim); }
 .ty-live b { font-family: var(--display); font-weight: 900; font-size: 2rem; color: var(--go); }
@@ -349,8 +354,8 @@ kbd {
 .ty-text .l.mk.bad { color: var(--miss); }
 .ty-tip { color: var(--dim); font-size: 0.85rem; text-align: center; max-width: 40ch; margin: auto 0 0; }
 /* Focus mode: while typing, only the words and the live counter stay. Mouse move brings the rest back. */
-.play-top, .ty-lens, .ty-bar .ghost, .ty-tip, .ty-hint { transition: opacity 0.25s; }
-body.ty-focus .play-top, body.ty-focus .ty-lens, body.ty-focus .ty-bar .ghost, body.ty-focus .ty-tip, body.ty-focus .ty-hint { opacity: 0; pointer-events: none; }
+.play-top, .ty-lens, .ty-tools, .ty-tip, .ty-hint { transition: opacity 0.25s; }
+body.ty-focus .play-top, body.ty-focus .ty-lens, body.ty-focus .ty-tools, body.ty-focus .ty-tip, body.ty-focus .ty-hint { opacity: 0; pointer-events: none; }
 body.ty-focus { cursor: none; }
 .ty-usual { color: var(--dim); margin: 0; font-variant-numeric: tabular-nums; }
 .ty-usual b { color: var(--paper); }

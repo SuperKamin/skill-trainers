@@ -14,6 +14,7 @@
 
 import { createTyper, MIN_RUN_CHARS } from './typing-engine.js';
 import { makeSource } from './typing-source.js';
+import { SOUNDS, readSound, saveSound, playKey, unlockSound } from './typing-sound.js';
 import { PACKS, PACK_LIST } from './packs/index.js';
 import { words, pairText } from './typing-words.js';
 import { allRuns, weakKeys, runChart, drawChart } from './typing-history.js';
@@ -126,7 +127,10 @@ export default {
         <div class="ty-bar">
           <div class="ty-lens" data-lens></div>
           <div class="ty-live"><b data-left></b><span data-wpm></span><button type="button" class="chip" data-done hidden>Done</button></div>
-          ${onPhone ? '' : '<button type="button" class="ghost" data-kbbtn>Keyboard</button>'}
+          <div class="ty-tools">
+            <button type="button" class="ghost" data-soundbtn></button>
+            ${onPhone ? '' : '<button type="button" class="ghost" data-kbbtn>Keyboard</button>'}
+          </div>
         </div>
         <div class="ty-stage" data-stage></div>
         <div class="ty-kb" data-kb hidden></div>
@@ -181,6 +185,7 @@ export default {
         known[code] = ok && dt != null && dt < FAST_MS ? (known[code] || 0) + 1 : ok ? (known[code] || 0) : 0;
         saveKnown(known);
       },
+      onType(k) { playKey(sound, k); },
       onStart() { hint.hidden = true; lens.classList.add('dim'); setFocus(true); doneBtn.hidden = !(mode === 'test' && kind === 'zen'); },
       onTick({ left: l, wpm, chars, words: w, elapsed }) {
         left.textContent = l != null ? Math.ceil(l)
@@ -441,6 +446,41 @@ export default {
       sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
     }
     function closeSheet() { sheet.hidden = true; sheet.innerHTML = ''; typer.focus(); }
+
+    // ---------- key sounds (off by default; settings stay on this device) ----------
+    let sound = readSound();
+    const soundBtn = $('[data-soundbtn]');
+    const drawSoundBtn = () => { soundBtn.textContent = sound.kind === 'off' ? 'Sound: off' : `Sound: ${SOUNDS.find(([k]) => k === sound.kind)[1].toLowerCase()}`; };
+    drawSoundBtn();
+    function openSound() {
+      unlockSound(); // this tap is what lets the phone play sound
+      sheet.hidden = false;
+      sheet.innerHTML = `
+        <div class="kb-panel snd-panel" role="dialog" aria-label="Key sounds">
+          <div class="kb-head">
+            <h2>Key sounds</h2>
+            <button type="button" class="ghost" data-close>Close</button>
+          </div>
+          <div class="ty-seg" data-kinds>${SOUNDS.map(([k, label]) => `<button type="button" class="chip${k === sound.kind ? ' on' : ''}" data-snd="${k}">${label}</button>`).join('')}</div>
+          <label class="snd-row">Volume <input type="range" min="0" max="1" step="0.05" value="${sound.vol}" data-vol></label>
+          <label class="snd-row"><input type="checkbox" data-wrong${sound.wrong ? ' checked' : ''}> A soft, low bump on a wrong key</label>
+          <p class="fine">Tap a sound to hear it. Each key gets its own sound, a little different every time; space sounds a bit deeper.</p>
+        </div>`;
+      const save = () => { saveSound(sound); drawSoundBtn(); };
+      sheet.querySelector('[data-kinds]').addEventListener('click', e => {
+        const b = e.target.closest('[data-snd]');
+        if (!b) return;
+        sound.kind = b.dataset.snd; save();
+        sheet.querySelectorAll('[data-snd]').forEach(x => x.classList.toggle('on', x === b));
+        playKey(sound, {}); setTimeout(() => playKey(sound, {}), 140); setTimeout(() => playKey(sound, { space: true }), 280);
+      });
+      sheet.querySelector('[data-vol]').addEventListener('input', e => { sound.vol = Number(e.target.value); save(); });
+      sheet.querySelector('[data-vol]').addEventListener('change', () => playKey(sound, {}));
+      sheet.querySelector('[data-wrong]').addEventListener('change', e => { sound.wrong = e.target.checked; save(); if (sound.wrong) playKey(sound, { ok: false }); });
+      sheet.querySelector('[data-close]').addEventListener('click', closeSheet);
+      sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+    }
+    soundBtn.addEventListener('click', () => { if (!typer.running) openSound(); });
     const kbBtn = $('[data-kbbtn]');
     if (kbBtn) kbBtn.addEventListener('click', () => { if (!typer.running) openSheet(); });
 

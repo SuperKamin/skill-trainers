@@ -48,6 +48,7 @@ const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' 
  *                  burst = speed of the last word finished by that second (space before it → space after it)
  *   onKey({ want, ok, dt }) — every scored keystroke at the end of the text (dt = ms since the key before, or null)
  *   onCaret(nextChar)       — whenever the next character to type changes (null at the end)
+ *   onType({ ok, space, back }) — once per change to the text, anywhere (for key sounds): back = something erased
  * reset(text, marks): marks = Set of character positions in text to highlight (e.g. the pairs being drilled).
  */
 export function createTyper(el, opts = {}) {
@@ -362,6 +363,10 @@ export function createTyper(el, opts = {}) {
       if (isLetter(prev) && typedW[i][c - 1] === w[c - 1]) bump(pairs, prev + k, ok, dt);
     }
     if (added.length) lastKeyAt = now;
+    if (opts.onType) {
+      if (added.length) opts.onType({ ok: !wrong, space: added[added.length - 1] === ' ' });
+      else if (removed > 0) opts.onType({ back: true });
+    }
 
     if (opts.more && tw.length - typedW.length < 15) append(opts.more());
     draw(locate(p).i - 1, Math.max(oldWords, typedW.length) + 1);
