@@ -85,13 +85,14 @@ const saveOpts = o => { try { localStorage.setItem(LS_OPTS, JSON.stringify(o)); 
 /** Which tests are "the same kind" (for bests and your usual): kind, length, pack, punctuation, numbers. */
 export const testKey = r => (r.kind === 'zen' ? 'zen'
   : r.kind === 'quote' ? `quote|${r.ql}|${r.pack || 'en'}`
-  : `${r.kind || 'time'}|${r.len}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
+  : `${r.kind || 'time'}|${r.len}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}${r.s ? 1 : 0}`);
 /** "30 s", "25 words · GDScript", "zen · Português · punctuation" */
 export function testLabel(r) {
   const k = r.kind || 'time';
   const parts = [k === 'zen' ? 'zen' : k === 'quote' ? `${r.ql} quote`
     : k === 'words' ? (r.len ? `${r.len} words` : 'endless words') : (r.len ? durLabel(r.len) : 'endless time')];
   if (r.pack && r.pack !== 'en') parts.push((PACKS[r.pack] || {}).name || r.pack);
+  if (r.s) parts.push('makes sense');
   if (r.p) parts.push('punctuation');
   if (r.n) parts.push('numbers');
   return parts.join(' · ');
@@ -145,9 +146,9 @@ export default {
     let quoteLen = QUOTE_LENS.includes(saved.quote) ? saved.quote : 'all';
     let quote = null, quoteWords = 0;
     let pack = PACKS[saved.pack] ? saved.pack : 'en';
-    let punct = !!saved.punct, nums = !!saved.nums;
+    let punct = !!saved.punct, nums = !!saved.nums, sense = !!saved.sense;
     let source = null;
-    const remember = () => saveOpts({ kind, words: wordCount, pack, punct, nums, quote: quoteLen });
+    const remember = () => saveOpts({ kind, words: wordCount, pack, punct, nums, sense, quote: quoteLen });
     /** A test with no end (custom 0): Done, Shift+Enter or Esc finishes it. */
     const endless = () => mode === 'test' && ((kind === 'time' && !len) || (kind === 'words' && !wordCount));
     const canEnd = () => mode === 'test' && (kind === 'zen' || endless());
@@ -159,6 +160,7 @@ export default {
       ql: kind === 'quote' ? (quote ? groupOf(quote.t) : quoteLen) : undefined,
       p: kind !== 'zen' && kind !== 'quote' && punct && !PACKS[pack].code,
       n: kind !== 'zen' && kind !== 'quote' && nums && !PACKS[pack].code,
+      s: (kind === 'time' || kind === 'words') && sense,
     });
     let focusPairs = null, usingFallback = false;
     let tipIndex = Math.floor(Math.random() * TIPS.length);
@@ -256,6 +258,7 @@ export default {
             if (c.ql) { rec.ql = c.ql; rec.by = quote.by; }
             if (c.p) rec.p = true;
             if (c.n) rec.n = true;
+            if (c.s) rec.s = true;
           }
           if (mode === 'pairs') { rec.len = PAIRS_SECONDS; rec.focus = focusPairs; }
           if (mode === 'learn') rec.len = 60;
@@ -301,7 +304,7 @@ export default {
         ${kind === 'words' ? `<div class="ty-seg">${WORD_COUNTS.map(v => chip('data-count', v, v, v === wordCount)).join('')}${customChip('words')}</div>` : ''}
         ${kind === 'quote' ? `<div class="ty-seg">${QUOTE_LENS.map(v => chip('data-qlen', v, v, v === quoteLen)).join('')}</div>` : ''}
         ${kind !== 'zen' ? `<select class="ty-pack" data-pack aria-label="Word pack">${PACK_LIST.filter(P => kind !== 'quote' || QUOTES[P.id]).map(P => `<option value="${P.id}"${P.id === pack ? ' selected' : ''}>${P.name}</option>`).join('')}</select>` : ''}
-        ${kind !== 'zen' && kind !== 'quote' && !code ? `<div class="ty-seg">${chip('data-flag', 'punct', 'punctuation', punct)}${chip('data-flag', 'nums', 'numbers', nums)}</div>` : ''}`;
+        ${kind === 'time' || kind === 'words' ? `<div class="ty-seg">${chip('data-flag', 'sense', 'makes sense', sense)}${code ? '' : chip('data-flag', 'punct', 'punctuation', punct) + chip('data-flag', 'nums', 'numbers', nums)}</div>` : ''}`;
     }
 
     /** The wrench: opens the custom box; shows the custom amount when one is in use. */
@@ -339,7 +342,7 @@ export default {
         typer.reset(q.t);
       } else if (mode === 'test') {
         const c = current();
-        source = makeSource({ pack, punct: c.p, nums: c.n });
+        source = makeSource({ pack, punct: c.p, nums: c.n, sense: c.s });
         typer.reset(kind === 'zen' ? '' : source(kind === 'words' && wordCount ? wordCount : 60));
       } else {
         typer.reset(words(60));
@@ -481,6 +484,7 @@ export default {
       if (b.dataset.kind) kind = b.dataset.kind;
       if (b.dataset.flag === 'punct') punct = !punct;
       if (b.dataset.flag === 'nums') nums = !nums;
+      if (b.dataset.flag === 'sense') sense = !sense;
       remember();
       fresh();
     });

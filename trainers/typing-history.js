@@ -14,11 +14,11 @@ let shownGroup = null;  // which kind of test the graph shows
 
 /** Tests are graphed per group: kind (time / words / zen) + pack + switches. Lengths share a graph. */
 const groupKey = r => (r.kind === 'zen' ? 'zen|-|00' : r.kind === 'quote' ? `quote|${r.pack || 'en'}|00`
-  : `${r.kind || 'time'}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
+  : `${r.kind || 'time'}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}${r.s ? 1 : 0}`);
 function groupLabel(key) {
   const [kind, pack, f] = key.split('|');
   return [kind === 'time' ? 'Time' : kind === 'words' ? 'Words' : kind === 'quote' ? 'Quote' : 'Zen', kind === 'zen' ? '' : PACK_NAME[pack] || pack,
-    f[0] === '1' ? 'punctuation' : '', f[1] === '1' ? 'numbers' : ''].filter(Boolean).join(' · ');
+    f[2] === '1' ? 'makes sense' : '', f[0] === '1' ? 'punctuation' : '', f[1] === '1' ? 'numbers' : ''].filter(Boolean).join(' · ');
 }
 
 /** Every run, oldest first, with its session's device. */
@@ -123,7 +123,7 @@ export function renderTypingHistory(el, sessions, source) {
 const MODE_LONG = { test: 'test', pairs: 'Weak pairs', clean: 'Clean run', learn: 'Learn the keys' };
 const runLabel = r => (r.kind === 'zen' ? 'zen' : r.kind === 'quote' ? `${r.ql} quote` : r.kind === 'words' ? (r.len ? `${r.len} words` : 'endless words')
   : r.len ? `${r.len} s ${MODE_LONG[r.m || 'test']}` : r.len === 0 ? 'endless time' : MODE_LONG[r.m || 'test'])
-  + (r.pack && r.pack !== 'en' ? ` · ${PACK_NAME[r.pack] || r.pack}` : '') + (r.p ? ' · punctuation' : '') + (r.n ? ' · numbers' : '');
+  + (r.pack && r.pack !== 'en' ? ` · ${PACK_NAME[r.pack] || r.pack}` : '') + (r.s ? ' · makes sense' : '') + (r.p ? ' · punctuation' : '') + (r.n ? ' · numbers' : '');
 
 /** History: one dot per Test run. Hover/tap a dot for how that run went. */
 function chart(rows, W) {

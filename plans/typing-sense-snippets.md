@@ -1,9 +1,9 @@
 # Plan: "makes sense" toggle + code snippets
 
-Status: **planned, not started** (Leo's ideas + picks, 08/10). Built one stage at a time, like `typing-monkeytype.md`.
+Status: **stage A done + live (08/10)**; stage B not started. (Leo's ideas + picks, 08/10.) Built one stage at a time, like `typing-monkeytype.md`.
 Read first: `README.md`, `trainers/typing-engine.js`, `trainers/typing.js`, `trainers/typing-source.js`, `trainers/packs/`.
 
-## Stage A: "makes sense" toggle (all four packs)
+## Stage A ✅: "makes sense" toggle (all four packs)
 A switch in the settings row, next to punctuation / numbers: **makes sense**. On = the text follows the
 language's logic instead of being random words. Off = today's random words (stays the default).
 Works in **time** and **words** (and their custom / no-end versions). Not in quote (already makes sense) or zen.
@@ -24,8 +24,11 @@ Works in **time** and **words** (and their custom / no-end versions). Not in quo
 - **mcfunction:** commands that would really work: `execute as @a at @s run tp @s ~ ~1 ~`,
   `scoreboard players add @s points 1`, `give @p minecraft:diamond 3`, `effect give @a minecraft:speed 10 1`,
   `tellraw @a {"text":"hi"}`. Selectors, coordinates, items and numbers come from small valid lists.
-- **Punctuation / numbers switches:** with "makes sense" on, sentences already have capitals and a full stop.
-  Punctuation on adds commas / ? / ! where the pattern allows; numbers on uses numbers in slots ("3 old books").
+- **Punctuation / numbers switches:** as built (08/10): punctuation **off** = all lowercase, no marks (same as the
+  random words); punctuation **on** = capitals, full stops, commas, questions and the odd !. Numbers on = digits in
+  count slots ("3 old books"), off = number words.
+- **Sense, not just grammar:** each verb carries the things and places that fit it, each kind of thing its own
+  describing words, and counts only where they fit (no "12 kitchens in the library").
 - **Bests / usual / History:** "makes sense" is part of the kind of test (`s: true` on the run, in `testKey`
   and the History group), so it's only compared with itself.
 - **Done when:** each pack produces 50 sentences/lines in a row that a native speaker / Godot / Minecraft would

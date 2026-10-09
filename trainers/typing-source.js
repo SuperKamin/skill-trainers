@@ -1,5 +1,6 @@
-// Where Test words come from: a word pack, plus the punctuation / numbers switches (like Monkeytype).
-// makeSource({ pack, punct, nums }) → next(n): the next n words as one string (keeps sentence state
+// Where Test words come from: a word pack, plus the punctuation / numbers switches (like Monkeytype),
+// and the "makes sense" switch (whole sentences / lines of code from the pack's grammar, sense-<id>.js).
+// makeSource({ pack, punct, nums, sense }) → next(n): the next n words as one string (keeps sentence state
 // between calls, so text added while you type continues the same sentence).
 import { PACKS } from './packs/index.js';
 
@@ -7,9 +8,18 @@ const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const chance = p => Math.random() < p;
 const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
 
-export function makeSource({ pack = 'en', punct = false, nums = false } = {}) {
+export function makeSource({ pack = 'en', punct = false, nums = false, sense = false } = {}) {
   const P = PACKS[pack] || PACKS.en;
   const usePunct = punct && !P.code, useNums = nums && !P.code;
+  if (sense && P.sense) {
+    // Sentence after sentence, handed out a word at a time.
+    let queue = [];
+    const nextWord = () => {
+      while (!queue.length) queue = P.sense({ punct: usePunct, nums: useNums }).split(' ').filter(Boolean);
+      return queue.shift();
+    };
+    return n => Array.from({ length: n }, nextWord).join(' ');
+  }
   let last = null, inSentence = 0, sentenceLen = rand(5, 12);
 
   function word() {
