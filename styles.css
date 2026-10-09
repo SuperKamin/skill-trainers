@@ -336,6 +336,16 @@ a { touch-action: manipulation; }
 .ty-text .l.x { color: color-mix(in srgb, var(--miss) 60%, var(--ink)); opacity: 1; }
 .ty-text .w.err { text-decoration: underline; text-decoration-color: var(--miss); text-decoration-thickness: 2px; text-underline-offset: 6px; }
 .ty-text .sel { background: color-mix(in srgb, var(--go) 35%, transparent); border-radius: 2px; }
+/* Separators: a space, a new line, a tab (code snippets). Wrong ones get a red mark. */
+.ty-text { tab-size: 4; -moz-tab-size: 4; }
+.ty-text .sep .bad { background: color-mix(in srgb, var(--miss) 45%, transparent); border-radius: 2px; }
+.ty-text .sep .nl.bad::before { content: "↵"; color: var(--miss); background: none; }
+.ty-text .sep.xs::after { content: "·"; color: var(--miss); font-weight: 700; }
+/* Indentation guides: a faint line at each tab, so you can see the indentation to type. */
+.ty-text .sep .tab { box-shadow: inset 1px 0 0 color-mix(in srgb, var(--dim) 35%, transparent); }
+.ty-text .sep .tab.ok { box-shadow: inset 1px 0 0 color-mix(in srgb, var(--paper) 45%, transparent); }
+/* Code: a little more room so the lines read like an editor. */
+.ty-text.code { font-size: clamp(1rem, 3.8vw, 1.35rem); }
 .ty-caret {
   position: absolute; left: 0; top: 0; width: 2px; border-radius: 1px; background: var(--go);
   pointer-events: none; transition: transform 0.09s ease-out;

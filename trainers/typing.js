@@ -12,11 +12,12 @@
 // kept apart; compared only with your own usual; short sessions; real words only.
 // Methods (tips you carry anywhere) rotate on screen.
 
-import { createTyper, MIN_RUN_CHARS } from './typing-engine.js';
+import { createTyper, MIN_RUN_CHARS, tokenize } from './typing-engine.js';
 import { makeSource } from './typing-source.js';
 import { SOUNDS, readSound, saveSound, playKey, unlockSound } from './typing-sound.js';
 import { PACKS, PACK_LIST } from './packs/index.js';
 import { QUOTES, QUOTE_GROUPS, groupOf } from './packs/quotes.js';
+import { SNIPPETS } from './packs/snippets.js';
 import { words, pairText } from './typing-words.js';
 import { allRuns, weakKeys, runChart, drawChart } from './typing-history.js';
 import { drawKeyboard, legendHtml, currentLayout, setLayout, detectLayout, codeFor, resetFingers, LAYOUTS } from './keyboard.js';
@@ -84,14 +85,15 @@ const saveOpts = o => { try { localStorage.setItem(LS_OPTS, JSON.stringify(o)); 
 
 /** Which tests are "the same kind" (for bests and your usual): kind, length, pack, punctuation, numbers. */
 export const testKey = r => (r.kind === 'zen' ? 'zen'
-  : r.kind === 'quote' ? `quote|${r.ql}|${r.pack || 'en'}`
+  : r.kind === 'quote' ? `quote|${r.ql}|${r.pack || 'en'}|${r.ind || ''}`
   : `${r.kind || 'time'}|${r.len}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}${r.s ? 1 : 0}`);
 /** "30 s", "25 words · GDScript", "zen · Português · punctuation" */
 export function testLabel(r) {
   const k = r.kind || 'time';
-  const parts = [k === 'zen' ? 'zen' : k === 'quote' ? `${r.ql} quote`
+  const parts = [k === 'zen' ? 'zen' : k === 'quote' ? `${r.ql} ${PACKS[r.pack]?.code ? 'snippet' : 'quote'}`
     : k === 'words' ? (r.len ? `${r.len} words` : 'endless words') : (r.len ? durLabel(r.len) : 'endless time')];
   if (r.pack && r.pack !== 'en') parts.push((PACKS[r.pack] || {}).name || r.pack);
+  if (r.ind === 'typed') parts.push('typed indentation');
   if (r.s) parts.push('makes sense');
   if (r.p) parts.push('punctuation');
   if (r.n) parts.push('numbers');
@@ -145,10 +147,14 @@ export default {
     let wordCount = Number.isInteger(saved.words) && saved.words >= 0 ? saved.words : 25; // 0 = no end
     let quoteLen = QUOTE_LENS.includes(saved.quote) ? saved.quote : 'all';
     let quote = null, quoteWords = 0;
+    let indent = saved.indent === 'typed' ? 'typed' : 'auto';
+    /** Quote test with a code pack = a code snippet (real lines, Enter for new lines). */
+    const snippet = () => mode === 'test' && kind === 'quote' && !!PACKS[pack].code;
+    const quoteSource = () => (PACKS[pack].code ? SNIPPETS : QUOTES);
     let pack = PACKS[saved.pack] ? saved.pack : 'en';
     let punct = !!saved.punct, nums = !!saved.nums, sense = !!saved.sense;
     let source = null;
-    const remember = () => saveOpts({ kind, words: wordCount, pack, punct, nums, sense, quote: quoteLen });
+    const remember = () => saveOpts({ kind, words: wordCount, pack, punct, nums, sense, quote: quoteLen, indent });
     /** A test with no end (custom 0): Done, Shift+Enter or Esc finishes it. */
     const endless = () => mode === 'test' && ((kind === 'time' && !len) || (kind === 'words' && !wordCount));
     const canEnd = () => mode === 'test' && (kind === 'zen' || endless());
@@ -158,6 +164,7 @@ export default {
       // Zen has no words to copy, so no pack and no switches; quotes bring their own punctuation.
       pack: kind === 'zen' ? undefined : pack,
       ql: kind === 'quote' ? (quote ? groupOf(quote.t) : quoteLen) : undefined,
+      ind: snippet() && indent === 'typed' ? 'typed' : undefined,
       p: kind !== 'zen' && kind !== 'quote' && punct && !PACKS[pack].code,
       n: kind !== 'zen' && kind !== 'quote' && nums && !PACKS[pack].code,
       s: (kind === 'time' || kind === 'words') && sense,
@@ -215,6 +222,8 @@ export default {
       },
       get zen() { return mode === 'test' && kind === 'zen'; },
       get canEnd() { return canEnd(); },
+      get autoIndent() { return snippet() && indent !== 'typed'; },
+      get tabTypes() { return snippet() && indent === 'typed'; },
       stopOnError: mode === 'clean',
       onCaret(ch) {
         if (mode !== 'learn') return;
@@ -256,6 +265,7 @@ export default {
             if (c.pack) rec.pack = c.pack;
             if (c.len != null) rec.len = c.len;
             if (c.ql) { rec.ql = c.ql; rec.by = quote.by; }
+            if (c.ind) rec.ind = c.ind;
             if (c.p) rec.p = true;
             if (c.n) rec.n = true;
             if (c.s) rec.s = true;
@@ -282,6 +292,9 @@ export default {
       const stopKeys = onPhone ? 'Tap Done' : 'Shift+Enter, Esc or Done';
       if (mode === 'test' && kind === 'zen') return `Type anything you like: no words to copy, no clock. ${stopKeys} when you're finished.`;
       if (endless()) return `No end: type as long as you like. ${stopKeys} when you're finished.`;
+      if (snippet()) return indent === 'typed'
+        ? `Type the code. Enter for a new line; type the indentation yourself with Tab.${onPhone ? '' : ' (Esc restarts.)'}`
+        : 'Type the code. Enter for a new line; the indentation fills itself.';
       if (mode === 'test' && kind === 'quote') return 'Type the quote. Who said it shows at the end.';
       if (mode === 'test' && kind === 'words') return `Type the ${wordCount} words. The clock starts on your first key.`;
       if (mode === 'test') return 'Tap the words (or just start typing). The clock starts on your first key.';
@@ -299,12 +312,19 @@ export default {
       const code = PACKS[pack].code;
       const chip = (attr, val, label, on) => `<button type="button" class="chip${on ? ' on' : ''}" ${attr}="${val}">${label}</button>`;
       lens.innerHTML = `
-        <div class="ty-seg">${KINDS.map(([k, label]) => chip('data-kind', k, label, k === kind)).join('')}</div>
+        <div class="ty-seg">${KINDS.map(([k, label]) => chip('data-kind', k, k === 'quote' && code ? 'snippet' : label, k === kind)).join('')}</div>
         ${kind === 'time' ? `<div class="ty-seg">${LENGTHS.map(v => chip('data-len', v, v + ' s', v === len)).join('')}${customChip('time')}</div>` : ''}
         ${kind === 'words' ? `<div class="ty-seg">${WORD_COUNTS.map(v => chip('data-count', v, v, v === wordCount)).join('')}${customChip('words')}</div>` : ''}
-        ${kind === 'quote' ? `<div class="ty-seg">${QUOTE_LENS.map(v => chip('data-qlen', v, v, v === quoteLen)).join('')}</div>` : ''}
-        ${kind !== 'zen' ? `<select class="ty-pack" data-pack aria-label="Word pack">${PACK_LIST.filter(P => kind !== 'quote' || QUOTES[P.id]).map(P => `<option value="${P.id}"${P.id === pack ? ' selected' : ''}>${P.name}</option>`).join('')}</select>` : ''}
+        ${kind === 'quote' ? `<div class="ty-seg">${quoteLens().map(v => chip('data-qlen', v, v, v === quoteLen)).join('')}</div>` : ''}
+        ${kind === 'quote' && code && pack === 'gd' ? `<div class="ty-seg">${chip('data-flag', 'indent', 'type indentation', indent === 'typed')}</div>` : ''}
+        ${kind !== 'zen' ? `<select class="ty-pack" data-pack aria-label="Word pack">${PACK_LIST.filter(P => kind !== 'quote' || QUOTES[P.id] || SNIPPETS[P.id]).map(P => `<option value="${P.id}"${P.id === pack ? ' selected' : ''}>${P.name}</option>`).join('')}</select>` : ''}
         ${kind === 'time' || kind === 'words' ? `<div class="ty-seg">${chip('data-flag', 'sense', 'makes sense', sense)}${code ? '' : chip('data-flag', 'punct', 'punctuation', punct) + chip('data-flag', 'nums', 'numbers', nums)}</div>` : ''}`;
+    }
+
+    /** Quote / snippet lengths that this pack has (all, then short → thicc). */
+    function quoteLens() {
+      const list = quoteSource()[pack] || [];
+      return QUOTE_LENS.filter(g => g === 'all' || list.some(q => groupOf(q.t) === g));
     }
 
     /** The wrench: opens the custom box; shows the custom amount when one is in use. */
@@ -334,11 +354,12 @@ export default {
         const { text, marks } = pairText(focusPairs);
         typer.reset(text, marks);
       } else if (mode === 'test' && kind === 'quote') {
-        if (!QUOTES[pack]) pack = 'en';
-        const list = QUOTES[pack].filter(q => quoteLen === 'all' || groupOf(q.t) === quoteLen);
+        if (!quoteSource()[pack]) pack = 'en';
+        if (!quoteLens().includes(quoteLen)) quoteLen = 'all';
+        const list = quoteSource()[pack].filter(q => quoteLen === 'all' || groupOf(q.t) === quoteLen);
         let q;
         do q = list[Math.floor(Math.random() * list.length)]; while (list.length > 1 && q === quote);
-        quote = q; quoteWords = q.t.split(' ').length;
+        quote = q; quoteWords = tokenize(q.t).words.length;
         typer.reset(q.t);
       } else if (mode === 'test') {
         const c = current();
@@ -461,7 +482,7 @@ export default {
             <span><b>${Math.round(run.raw)}</b> raw</span>
             <span><b>${run.fixes}</b> ${run.fixes === 1 ? 'fix' : 'fixes'}</span>
           </div>
-          ${mode === 'test' && kind === 'quote' && quote ? `<p class="ty-by">${quote.by}</p>` : ''}
+          ${mode === 'test' && kind === 'quote' && quote ? `<p class="ty-by">${quote.by}${PACKS[pack].code ? ` · ${PACKS[pack].name}` : ''}</p>` : ''}
           ${bestLine(run)}
           ${runBlock(run)}
           ${mode === 'pairs' ? pairLine(run) : trickiest(run.keys)}
@@ -485,6 +506,7 @@ export default {
       if (b.dataset.flag === 'punct') punct = !punct;
       if (b.dataset.flag === 'nums') nums = !nums;
       if (b.dataset.flag === 'sense') sense = !sense;
+      if (b.dataset.flag === 'indent') indent = indent === 'typed' ? 'auto' : 'typed';
       remember();
       fresh();
     });

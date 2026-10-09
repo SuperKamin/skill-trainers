@@ -1,6 +1,6 @@
 # Plan: "makes sense" toggle + code snippets
 
-Status: **stage A done + live (08/10)**; stage B not started. (Leo's ideas + picks, 08/10.) Built one stage at a time, like `typing-monkeytype.md`.
+Status: **stages A + B done + live (08/10)**. (Leo's ideas + picks, 08/10.) Built one stage at a time, like `typing-monkeytype.md`.
 Read first: `README.md`, `trainers/typing-engine.js`, `trainers/typing.js`, `trainers/typing-source.js`, `trainers/packs/`.
 
 ## Stage A ✅: "makes sense" toggle (all four packs)
@@ -34,7 +34,7 @@ Works in **time** and **words** (and their custom / no-end versions). Not in quo
 - **Done when:** each pack produces 50 sentences/lines in a row that a native speaker / Godot / Minecraft would
   accept. Check Portuguese agreement by reading a batch. Tested in time + words, PC + phone.
 
-## Stage B: code snippets (the "quote" test for GDScript and mcfunction)
+## Stage B ✅: code snippets (the "quote" test for GDScript and mcfunction)
 For code packs, the **quote** kind becomes **snippet**: a real little piece of code, short / medium / long
 (no "thicc" unless we write some). Written for this app (our own code, so no licence issue). Who/what it is shows
 at the end, like a quote's source (e.g. "Player jump, GDScript").

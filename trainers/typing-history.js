@@ -8,6 +8,7 @@ const DAY = 864e5;
 const mean = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 const MODE = { test: 'Test', pairs: 'Pairs', clean: 'Clean', learn: 'Learn' };
 const PACK_NAME = { en: 'English', pt: 'Português', gd: 'GDScript', mcf: 'mcfunction' };
+const CODE = new Set(['gd', 'mcf']);
 
 let shownDevice = null; // remembered while the page is open
 let shownGroup = null;  // which kind of test the graph shows
@@ -17,7 +18,7 @@ const groupKey = r => (r.kind === 'zen' ? 'zen|-|00' : r.kind === 'quote' ? `quo
   : `${r.kind || 'time'}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}${r.s ? 1 : 0}`);
 function groupLabel(key) {
   const [kind, pack, f] = key.split('|');
-  return [kind === 'time' ? 'Time' : kind === 'words' ? 'Words' : kind === 'quote' ? 'Quote' : 'Zen', kind === 'zen' ? '' : PACK_NAME[pack] || pack,
+  return [kind === 'time' ? 'Time' : kind === 'words' ? 'Words' : kind === 'quote' ? (CODE.has(pack) ? 'Snippet' : 'Quote') : 'Zen', kind === 'zen' ? '' : PACK_NAME[pack] || pack,
     f[2] === '1' ? 'makes sense' : '', f[0] === '1' ? 'punctuation' : '', f[1] === '1' ? 'numbers' : ''].filter(Boolean).join(' · ');
 }
 
@@ -121,7 +122,7 @@ export function renderTypingHistory(el, sessions, source) {
 }
 
 const MODE_LONG = { test: 'test', pairs: 'Weak pairs', clean: 'Clean run', learn: 'Learn the keys' };
-const runLabel = r => (r.kind === 'zen' ? 'zen' : r.kind === 'quote' ? `${r.ql} quote` : r.kind === 'words' ? (r.len ? `${r.len} words` : 'endless words')
+const runLabel = r => (r.kind === 'zen' ? 'zen' : r.kind === 'quote' ? `${r.ql} ${CODE.has(r.pack) ? 'snippet' : 'quote'}${r.ind === 'typed' ? ' · typed indentation' : ''}` : r.kind === 'words' ? (r.len ? `${r.len} words` : 'endless words')
   : r.len ? `${r.len} s ${MODE_LONG[r.m || 'test']}` : r.len === 0 ? 'endless time' : MODE_LONG[r.m || 'test'])
   + (r.pack && r.pack !== 'en' ? ` · ${PACK_NAME[r.pack] || r.pack}` : '') + (r.s ? ' · makes sense' : '') + (r.p ? ' · punctuation' : '') + (r.n ? ' · numbers' : '');
 

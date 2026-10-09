@@ -1,15 +1,19 @@
 // Typing engine: shows a text, takes what you type (physical keyboard or phone keyboard),
 // colours it right/wrong, and measures it. Every typing mode is built on this.
 //
-// How input works: one hidden <input> holds everything typed so far, and it is the single
+// How input works: one hidden <textarea> holds everything typed so far, and it is the single
 // source of truth. Because it's a real text box, all the editing keys work natively, on PC
 // and phone: Backspace, Ctrl+Backspace, Delete, ← →, Ctrl+← →, Shift(+Ctrl)+← → to select,
-// typing over a selection, typing in the middle (inserts). We never block those; we just
-// draw what's in the box: its text, its caret, its selection.
+// typing over a selection, typing in the middle (inserts), and ↑ ↓ across lines in code.
+// We never block those; we just draw what's in the box: its text, its caret, its selection.
 //
-// Words like Monkeytype: typed word i is lined up with target word i (split on spaces).
-// Space jumps to the next word; a word left unfinished or wrong gets underlined and its
-// missing letters count as missed; letters typed past the end of a word show as extras.
+// Words like Monkeytype: the text is words with separators between them — a space, or (in code
+// snippets) a new line plus indentation. Typed word i is lined up with target word i. A separator
+// moves on to the next word; a word left unfinished or wrong gets underlined and its missing letters
+// count as missed; letters typed past the end of a word show as extras.
+// New lines (code snippets only): Enter types one. With autoIndent, the rest of the separator
+// (the next line's tabs, or a blank line) fills itself and isn't counted; with tabTypes, Tab types a
+// tab and it counts like any key.
 //
 // What it measures (research/typing.md): speed, accuracy, corrections (fixes), and per key +
 // per letter pair: how often typed, mistakes, and time since the key before. Timing only
@@ -21,6 +25,7 @@ export const MIN_RUN_CHARS = 10;
 export const wpmOf = (chars, ms) => (ms > 0 ? (chars / 5) / (ms / 60000) : 0);
 
 const isLetter = c => c >= 'a' && c <= 'z';
+const isSep = c => c === ' ' || c === '\n' || c === '\t';
 
 /** Consistency like Monkeytype: 100 = perfectly even speed second to second (from the raw speed's coefficient of variation). */
 export function consistency(raw) {
@@ -34,6 +39,24 @@ export function consistency(raw) {
 const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c);
 
 /**
+ * Text → words and the separator after each one (a run of spaces / new lines / tabs; '' after the last).
+ * If the text ends with a separator, an empty word follows (the word being started), so
+ * words.length - 1 is always the number of finished words.
+ */
+export function tokenize(str) {
+  const words = [], seps = [];
+  let i = 0;
+  do {
+    let j = i; while (j < str.length && !isSep(str[j])) j++;
+    let k = j; while (k < str.length && isSep(str[k])) k++;
+    words.push(str.slice(i, j)); seps.push(str.slice(j, k));
+    i = k;
+  } while (i < str.length);
+  if (seps[seps.length - 1]) { words.push(''); seps.push(''); }
+  return { words, seps };
+}
+
+/**
  * createTyper(el, opts) → { reset(text, marks?), focus(), running, stop(), destroy() }
  * opts:
  *   seconds      — timed run length (null = untimed)
@@ -41,12 +64,14 @@ const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' 
  *   stopOnError  — the run ends at the first wrong key (Clean run)
  *   zen          — no text to copy: whatever you type is the text (all of it counts as right); Shift+Enter ends it
  *   canEnd       — Shift+Enter ends the run (zen, and tests with no end)
- *   Untimed with no more(): a word-count test — ends when the last word is right, or on a space after it.
+ *   autoIndent   — code snippets: after Enter, the rest of the separator (tabs, blank line) fills itself
+ *   tabTypes     — code snippets: Tab types a tab (instead of leaving it to the page, where it restarts)
+ *   Untimed with no more(): a word-count test — ends when the last word is right, or on a separator after it.
  *   onStart()    — first keystroke
  *   onTick({ elapsed, left, wpm, chars, words }) — about 4×/s while running (words = words finished)
  *   onDone(run)  — finished; run = { ms, wpm, raw, acc, chars, correct, fixes, wordsClean, keys, pairs, ended,
  *                  sec: { wpm[], raw[], err[], burst[] } (one per second), cons (consistency %, or null), ch: { ok, bad, x, miss } }
- *                  burst = speed of the last word finished by that second (space before it → space after it)
+ *                  burst = speed of the last word finished by that second (separator before it → separator after it)
  *   onKey({ want, ok, dt }) — every scored keystroke at the end of the text (dt = ms since the key before, or null)
  *   onCaret(nextChar)       — whenever the next character to type changes (null at the end)
  *   onType({ ok, space, back }) — once per change to the text, anywhere (for key sounds): back = something erased
@@ -57,15 +82,16 @@ export function createTyper(el, opts = {}) {
     <div class="ty-box" data-box tabindex="-1">
       <div class="ty-text" data-text><i class="ty-caret idle" data-caret></i></div>
     </div>
-    <input class="ty-input" data-input type="text" autocomplete="off" autocapitalize="off"
-      autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Type here">`;
+    <textarea class="ty-input" data-input rows="1" wrap="off" autocomplete="off" autocapitalize="off"
+      autocorrect="off" spellcheck="false" aria-label="Type here"></textarea>`;
   const box = el.querySelector('[data-box]');
   const textEl = el.querySelector('[data-text]');
   const caret = el.querySelector('[data-caret]');
   const input = el.querySelector('[data-input]');
 
-  let target = '', tw = [], starts = [], wordEls = [], spEls = [], marks = new Set();
-  let typed = '', typedW = [''];
+  let target = '', tw = [], tsep = [], starts = [], wordEls = [], spEls = [], marks = new Set();
+  let multiline = false;
+  let typed = '', typedW = [''], typedS = [''];
   let started = 0, done = false, tick = 0, timer = 0, lastKeyAt = 0, composing = false;
   let strokes = 0, goodStrokes = 0, fixes = 0;
   // key → [times typed, mistakes, total ms since previous key, how many of those were timed]
@@ -82,18 +108,21 @@ export function createTyper(el, opts = {}) {
 
   // ---------- drawing ----------
   function indexWords() {
-    tw = target.split(' ');
+    ({ words: tw, seps: tsep } = tokenize(target));
+    // A target never has a word being started: drop the empty word tokenize adds after a final separator.
+    if (!opts.zen && tw.length > 1 && tw[tw.length - 1] === '' && tsep[tw.length - 2]) { tw.pop(); tsep.pop(); }
     starts = [];
     let at = 0;
-    for (const w of tw) { starts.push(at); at += w.length + 1; }
+    tw.forEach((w, i) => { starts.push(at); at += w.length + tsep[i].length; });
   }
+  function retokenize() { ({ words: typedW, seps: typedS } = tokenize(typed)); }
 
   function addWords(from) {
     const frag = document.createDocumentFragment();
     for (let i = from; i < tw.length; i++) {
-      if (i > 0) {
+      if (i > 0 && !spEls[i - 1]) {
         const sp = document.createElement('span');
-        sp.className = 'sp'; sp.textContent = ' ';
+        sp.className = 'sep';
         frag.appendChild(sp); spEls[i - 1] = sp;
       }
       const w = document.createElement('span');
@@ -101,19 +130,38 @@ export function createTyper(el, opts = {}) {
       frag.appendChild(w); wordEls[i] = w;
     }
     textEl.appendChild(frag);
-    for (let i = from; i < tw.length; i++) paintWord(i);
+    for (let i = Math.max(0, from - 1); i < tw.length; i++) paintWord(i);
   }
 
-  /** Where input position k falls: word index + letter index within that typed word. */
+  /** Where caret position k falls: word i, letter c in it, and s = how far into the separator after it (0 = not in it). */
   function locate(k) {
     let i = 0, at = 0;
-    while (i < typedW.length - 1 && k > at + typedW[i].length) { at += typedW[i].length + 1; i++; }
-    return { i, c: k - at };
+    while (i < typedW.length - 1) {
+      const end = at + typedW[i].length;
+      if (k <= end) break;
+      const sepEnd = end + typedS[i].length;
+      if (k < sepEnd) return { i, c: typedW[i].length, s: k - end };
+      at = sepEnd; i++;
+    }
+    return { i, c: k - at, s: 0 };
+  }
+
+  /** Which typed character is at position pos: letter c of word i, or separator character j after word i. */
+  function where(pos) {
+    let at = 0;
+    for (let i = 0; i < typedW.length; i++) {
+      const end = at + typedW[i].length;
+      if (pos < end) return { i, c: pos - at, j: null };
+      const sepEnd = end + typedS[i].length;
+      if (pos < sepEnd) return { i, c: typedW[i].length, j: pos - end };
+      at = sepEnd;
+    }
+    return { i: typedW.length - 1, c: pos - at, j: null };
   }
 
   function paintWord(i) {
     const want = tw[i], got = i < typedW.length ? typedW[i] : null;
-    const finished = i < typedW.length - 1; // a space was typed after it
+    const finished = i < typedW.length - 1; // a separator was typed after it
     const n = Math.max(want.length, got ? got.length : 0);
     let html = '';
     for (let c = 0; c < n; c++) {
@@ -131,16 +179,38 @@ export function createTyper(el, opts = {}) {
     const w = wordEls[i];
     w.innerHTML = html;
     w.className = 'w' + (finished && got !== want ? ' err' : '');
+    paintSep(i);
+  }
+
+  /** True once you've moved past the separator after word i (the next word has started). */
+  const sepDone = i => i < typedW.length - 2 || (i === typedW.length - 2 && typedW[i + 1] !== '');
+
+  /** The separator after word i: one box per character (space, new line, tab), right / wrong as typed. */
+  function paintSep(i) {
+    const el = spEls[i];
+    if (!el) return;
+    const want = tsep[i] || '';
+    const got = i < typedW.length - 1 || (i === typedW.length - 1 && typedS[i]) ? typedS[i] : '';
+    const complete = sepDone(i);
+    let html = '';
+    for (let j = 0; j < want.length; j++) {
+      const ch = want[j];
+      let cls = ch === '\n' ? 'nl' : ch === '\t' ? 'tab' : 'sp';
+      if (j < got.length) cls += got[j] === ch ? ' ok' : ' bad';
+      else if (complete) cls += ' bad'; // left out (e.g. a tab of indentation) and already moved on
+      html += `<span class="${cls}">${ch}</span>`;
+    }
+    el.innerHTML = html;
+    el.className = 'sep' + (got.length > want.length ? ' xs' : '');
   }
 
   function paintSelection() {
     textEl.querySelectorAll('.sel').forEach(s => s.classList.remove('sel'));
     const a = input.selectionStart ?? typed.length, b = input.selectionEnd ?? a;
-    if (b <= a) return;
-    let { i, c } = locate(a);
-    for (let k = a; k < b && i < typedW.length; k++) {
-      if (c < typedW[i].length) { wordEls[i]?.children[c]?.classList.add('sel'); c++; }
-      else { spEls[i]?.classList.add('sel'); i++; c = 0; }
+    for (let k = a; k < b; k++) {
+      const { i, c, j } = where(k);
+      if (j == null) wordEls[i]?.children[c]?.classList.add('sel');
+      else spEls[i]?.children[Math.min(j, (spEls[i]?.children.length || 1) - 1)]?.classList.add('sel');
     }
   }
 
@@ -148,14 +218,18 @@ export function createTyper(el, opts = {}) {
 
   function placeCaret() {
     const k = input.selectionDirection === 'backward' ? input.selectionStart : input.selectionEnd;
-    const { i, c } = locate(k ?? typed.length);
+    const { i, c, s } = locate(k ?? typed.length);
     const w = wordEls[Math.min(i, wordEls.length - 1)];
     if (!w) return;
     const kids = w.children;
+    const sepKids = s ? spEls[i]?.children : null;
     let x, y, h;
-    if (!kids.length) { x = w.offsetLeft; y = w.offsetTop; h = w.offsetHeight; }
-    else if (c < kids.length) { const s = kids[c]; x = s.offsetLeft; y = s.offsetTop; h = s.offsetHeight; }
-    else { const s = kids[kids.length - 1]; x = s.offsetLeft + s.offsetWidth; y = s.offsetTop; h = s.offsetHeight; }
+    const at = el => { x = el.offsetLeft; y = el.offsetTop; h = el.offsetHeight; };
+    const after = el => { x = el.offsetLeft + el.offsetWidth; y = el.offsetTop; h = el.offsetHeight; };
+    if (sepKids && sepKids.length) { if (s < sepKids.length) at(sepKids[s]); else after(sepKids[sepKids.length - 1]); }
+    else if (!kids.length) at(w);
+    else if (c < kids.length) at(kids[c]);
+    else after(kids[kids.length - 1]);
     caret.style.height = h + 'px';
     caret.style.transform = `translate(${x - 1}px, ${y}px)`;
     // Keep the caret's line as the first or second of the three visible lines.
@@ -165,7 +239,7 @@ export function createTyper(el, opts = {}) {
     textEl.style.transform = `translateY(${-Math.max(0, line - 1) * lh}px)`;
     // What comes next at the caret (for the lit key in Learn the keys).
     const want = tw[i] ?? '';
-    const next = c < want.length ? want[c] : i < tw.length - 1 ? ' ' : null;
+    const next = s ? (tsep[i] || '')[s] ?? null : c < want.length ? want[c] : (tsep[i] || '')[0] ?? null;
     if (next !== lastNext) { lastNext = next; opts.onCaret && opts.onCaret(next); }
   }
 
@@ -194,15 +268,21 @@ export function createTyper(el, opts = {}) {
   }
 
   // ---------- measuring ----------
+  /** Characters actually typed: auto-filled indentation doesn't count. */
+  function typedCount() {
+    if (!opts.autoIndent) return typed.length;
+    return typed.length - typedS.reduce((n, s) => n + (s.includes('\n') ? s.length - 1 : 0), 0);
+  }
+
   function stats(now) {
     const ms = Math.max(1, now - started);
     let correct = 0;
     typedW.forEach((g, i) => {
       const w = tw[i] ?? '';
       for (let c = 0; c < Math.min(g.length, w.length); c++) if (g[c] === w[c]) correct++;
-      if (i < typedW.length - 1) correct++; // the space after it
+      if (i < typedW.length - 1) correct++; // the separator after it counts as one character
     });
-    return { ms, correct, wpm: wpmOf(correct, ms), raw: wpmOf(typed.length, ms) };
+    return { ms, correct, wpm: wpmOf(correct, ms), raw: wpmOf(typedCount(), ms) };
   }
 
   /** Record the wpm at every whole second that has passed (up to the run's length). */
@@ -222,6 +302,8 @@ export function createTyper(el, opts = {}) {
       for (let c = 0; c < Math.min(g.length, w.length); c++) g[c] === w[c] ? ch.ok++ : ch.bad++;
       if (g.length > w.length) ch.x += g.length - w.length;
       else if (i < typedW.length - 1) ch.miss += w.length - g.length;
+      // Code: indentation left out counts as missed too.
+      if (multiline && sepDone(i) && (tsep[i] || '').length > typedS[i].length) ch.miss += tsep[i].length - typedS[i].length;
     });
     return ch;
   }
@@ -290,11 +372,18 @@ export function createTyper(el, opts = {}) {
     if (opts.seconds) timer = setTimeout(() => finish('time'), opts.seconds * 1000);
   }
 
-  /** No space at the very start, no two spaces in a row (no empty words), no words past the end. */
+  /** Up to the end of word n-1 (drops anything typed after the last word). */
+  function upToWords(t, n) {
+    let out = '';
+    for (let k = 0; k < n; k++) out += t.words[k] + (k < n - 1 ? t.seps[k] : '');
+    return out;
+  }
+
+  /** No separator at the very start, no two spaces in a row (no empty words), no words past the end. */
   function tidy(val) {
-    let out = val.replace(/^ +/, '').replace(/ {2,}/g, ' ');
-    const ws = out.split(' ');
-    if (!opts.zen && ws.length > tw.length) out = ws.slice(0, tw.length).join(' ');
+    let out = val.replace(/^[ \n\t]+/, '').replace(/ {2,}/g, ' ');
+    if (!multiline) out = out.replace(/[\n\t]/g, '');
+    if (!opts.zen) { const t = tokenize(out); if (t.words.length > tw.length) out = upToWords(t, tw.length); }
     return out;
   }
 
@@ -303,7 +392,7 @@ export function createTyper(el, opts = {}) {
     if (composing) return; // wait until the phone keyboard settles the word
     let val = input.value;
     const wordTest = !opts.seconds && !opts.more && !opts.zen;
-    const pastEnd = wordTest && val.replace(/^ +/, '').replace(/ {2,}/g, ' ').split(' ').length > tw.length;
+    const pastEnd = wordTest && tokenize(val.replace(/^[ \n\t]+/, '').replace(/ {2,}/g, ' ')).words.length > tw.length;
     const clean = tidy(val);
     if (clean !== val) {
       const pos = input.selectionStart ?? clean.length;
@@ -327,28 +416,32 @@ export function createTyper(el, opts = {}) {
     if (added.length && !started) begin(now);
 
     const oldWords = typedW.length;
+    const before = typed;
     typed = val;
-    typedW = typed.split(' ');
+    retokenize();
     if (opts.zen) syncZen();
 
-    // Score each new character against the word it landed in.
+    // Score each new character against the word (or separator) it landed in.
     let wrong = false;
     for (let n = 0; n < added.length; n++) {
       const pos = p + n;
-      const { i, c } = locate(pos);
+      const { i, c, j } = where(pos);
       const ch = added[n];
       const w = tw[i] ?? '';
       let want, ok;
-      if (ch === ' ') { want = ' '; ok = typedW[i] === w; } // a space is right when it ends a right word
-      else { want = w[c]; ok = ch === want; }
+      if (j != null) {
+        // A separator: right when it's the expected one (and the word before it is right).
+        want = (tsep[i] || '')[j];
+        ok = ch === want && (j > 0 || typedW[i] === w);
+      } else { want = w[c]; ok = ch === want; }
       strokes++; if (ok) goodStrokes++;
       if (!ok) wrong = true;
       const b = Math.floor((now - started) / 1000);
       secKeys[b] = (secKeys[b] || 0) + 1;
       if (!ok) secErr[b] = (secErr[b] || 0) + 1;
       if (!atEnd) continue; // edits further back: no timing, no key/pair stats
-      if (ch === ' ') {
-        // A word finished at the end: its burst speed, from the space before it to this one.
+      if (j === 0) {
+        // A word finished at the end: its burst speed, from the separator before it to this one.
         const ms = now - wordFrom;
         if (ms > 0 && typedW[i].length) secBurst[b] = Math.round(wpmOf(typedW[i].length + 1, ms));
         wordFrom = now;
@@ -357,42 +450,76 @@ export function createTyper(el, opts = {}) {
       const dt = added.length === 1 && strokes > 1 ? now - lastKeyAt : null;
       if (want == null) continue; // an extra letter: counted wrong above, no key to blame
       const k = want.toLowerCase();
-      if (k !== ' ') bump(keys, k, ok, dt);
+      if (!isSep(k)) bump(keys, k, ok, dt);
       opts.onKey && opts.onKey({ want, ok, dt });
       // A letter pair counts when the key before it (same word) was typed right.
-      const prev = isLetter(k) && c > 0 && c <= w.length ? w[c - 1].toLowerCase() : ' ';
+      const prev = j == null && isLetter(k) && c > 0 && c <= w.length ? w[c - 1].toLowerCase() : ' ';
       if (isLetter(prev) && typedW[i][c - 1] === w[c - 1]) bump(pairs, prev + k, ok, dt);
     }
     if (added.length) lastKeyAt = now;
+
+    if (opts.autoIndent && multiline) {
+      // Enter at the end: the rest of the line break (the next line's tabs, a blank line) fills itself.
+      if (atEnd && added.endsWith('\n')) {
+        const { i, j } = where(typed.length - 1);
+        const want = tsep[i] || '';
+        if (j === 0 && want[0] === '\n' && /^[\n\t]+$/.test(want) && want.length > 1) setTyped(typed + want.slice(1));
+      // Backspace into filled-in indentation: the whole line break goes, back to the end of the line above.
+      } else if (removed > 0 && !added && s === 0 && /[\n\t]$/.test(before) && /\n[\n\t]*$/.test(typed)) {
+        setTyped(typed.replace(/\n[\n\t]*$/, ''));
+      }
+    }
+
     if (opts.onType) {
-      if (added.length) opts.onType({ ok: !wrong, space: added[added.length - 1] === ' ' });
+      if (added.length) opts.onType({ ok: !wrong, space: isSep(added[added.length - 1]) });
       else if (removed > 0) opts.onType({ back: true });
     }
 
     if (opts.more && tw.length - typedW.length < 15) append(opts.more());
-    draw(locate(p).i - 1, Math.max(oldWords, typedW.length) + 1);
+    draw(where(Math.max(0, p - 1)).i - 1, Math.max(oldWords, typedW.length) + 1);
 
     if (opts.stopOnError && wrong) { finish('error'); return; }
-    // Word-count test: done once the last word is typed right, or on a space after it.
+    // Word-count test (and quotes / snippets): done once the last word is typed right, or on a separator after it.
     const last = tw.length - 1;
     if (wordTest && (pastEnd || (typedW.length - 1 === last && typedW[last] === tw[last]))) finish('end');
+  }
+
+  /** Change what's typed from here (auto indentation), keeping the caret at the end. */
+  function setTyped(v) {
+    typed = v;
+    input.value = v;
+    input.setSelectionRange(v.length, v.length);
+    retokenize();
   }
 
   input.addEventListener('input', onInput);
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; onInput(); });
-  // A space where it would make an empty word does nothing (like Monkeytype).
+  // A space (or new line) where it would make an empty word does nothing (like Monkeytype).
   input.addEventListener('beforeinput', e => {
-    if (e.inputType !== 'insertText' || e.data !== ' ' || e.isComposing) return;
+    if (e.isComposing) return;
     const a = input.selectionStart, b = input.selectionEnd;
+    if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') {
+      if (!multiline || (a === b && a === 0)) e.preventDefault();
+      return;
+    }
+    if (e.inputType !== 'insertText' || e.data !== ' ') return;
     if (a !== b) return;
-    if (a === 0 || typed[a - 1] === ' ' || typed[a] === ' ') e.preventDefault();
+    if (a === 0 || isSep(typed[a - 1] ?? '') || isSep(typed[a] ?? '')) e.preventDefault();
   });
-  // Enter does nothing while typing. Every other key (arrows, Ctrl, Shift, Delete…) is the text box's own.
   input.addEventListener('keydown', e => {
+    // Tab types a tab in code snippets when you type the indentation yourself.
+    if (e.key === 'Tab' && opts.tabTypes && multiline && !e.ctrlKey && !e.altKey) {
+      e.preventDefault(); e.stopPropagation();
+      if (done) return;
+      input.setRangeText('\t', input.selectionStart, input.selectionEnd, 'end');
+      onInput();
+      return;
+    }
     if (e.key !== 'Enter') return;
-    e.preventDefault();
-    if ((opts.zen || opts.canEnd) && e.shiftKey) finish('end');
+    // Shift+Enter ends zen / tests with no end. Enter types a new line only in code snippets.
+    if ((opts.zen || opts.canEnd) && e.shiftKey) { e.preventDefault(); finish('end'); return; }
+    if (!multiline) e.preventDefault();
   });
   // Moving the caret / selecting doesn't change the text, so redraw on those too.
   const onSel = () => { if (document.activeElement === input && !done) { paintSelection(); placeCaret(); } };
@@ -407,11 +534,14 @@ export function createTyper(el, opts = {}) {
   return {
     reset(text, markSet) {
       clearInterval(tick); clearTimeout(timer);
-      target = text; typed = ''; typedW = ['']; input.value = ''; marks = markSet || new Set();
+      target = text; typed = ''; typedW = ['']; typedS = ['']; input.value = ''; marks = markSet || new Set();
+      multiline = text.includes('\n');
+      input.setAttribute('enterkeyhint', multiline ? 'enter' : 'done');
       started = 0; done = false; strokes = 0; goodStrokes = 0; fixes = 0; keys = {}; pairs = {};
       secWpm = []; secKeys = []; secErr = []; secBurst = []; wordFrom = 0;
       lastNext = undefined;
-      textEl.querySelectorAll('.w, .sp').forEach(n => n.remove());
+      textEl.querySelectorAll('.w, .sep').forEach(n => n.remove());
+      textEl.classList.toggle('code', multiline);
       wordEls = []; spEls = [];
       indexWords();
       addWords(0);
