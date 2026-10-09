@@ -40,6 +40,7 @@ const esc = c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' 
  *   more()       — returns more text (starting with a space) to append near the end (optional)
  *   stopOnError  — the run ends at the first wrong key (Clean run)
  *   zen          — no text to copy: whatever you type is the text (all of it counts as right); Shift+Enter ends it
+ *   canEnd       — Shift+Enter ends the run (zen, and tests with no end)
  *   Untimed with no more(): a word-count test — ends when the last word is right, or on a space after it.
  *   onStart()    — first keystroke
  *   onTick({ elapsed, left, wpm, chars, words }) — about 4×/s while running (words = words finished)
@@ -391,7 +392,7 @@ export function createTyper(el, opts = {}) {
   input.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    if (opts.zen && e.shiftKey) finish('end');
+    if ((opts.zen || opts.canEnd) && e.shiftKey) finish('end');
   });
   // Moving the caret / selecting doesn't change the text, so redraw on those too.
   const onSel = () => { if (document.activeElement === input && !done) { paintSelection(); placeCaret(); } };

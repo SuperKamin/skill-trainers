@@ -301,6 +301,19 @@ a { touch-action: manipulation; }
 .ty-live [data-done] { margin-left: 0.6rem; }
 .ty-tools { display: flex; gap: 0.2rem; }
 .kb-panel.snd-panel { max-width: 480px; }
+.ty-custom { display: inline-flex; align-items: center; gap: 0.35rem; }
+.ty-custom svg { display: block; }
+.cus-now { margin: 0; color: var(--paper); font-weight: 700; }
+.cus-now.bad { color: var(--miss); font-weight: 400; }
+.cus-in {
+  width: 100%; box-sizing: border-box; background: var(--ink); color: var(--paper); border: 2px solid var(--line);
+  border-radius: 12px; padding: 0.7rem 0.9rem; font: inherit; font-size: 1.3rem;
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+.cus-in:focus { outline: none; border-color: var(--go); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ty-by { margin: 0; color: var(--dim); font-style: italic; }
+.ty-by::before { content: "— "; }
 .snd-row { display: flex; align-items: center; gap: 0.7rem; color: var(--dim); }
 .snd-row input[type="range"] { flex: 1; accent-color: var(--go); }
 .snd-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--go); }

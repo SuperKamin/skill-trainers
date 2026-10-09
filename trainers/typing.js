@@ -1,7 +1,7 @@
 // Typing trainer. Built on typing-engine.js. Research: research/typing.md
 // Modes:
-//   test   — the classic test, Monkeytype-style: time (15 / 30 / 60 s), words (10 / 25 / 50 / 100) or zen
-//            (no text, no clock); a word pack (English, Português, GDScript, mcfunction — packs/) and the
+//   test   — the classic test, Monkeytype-style: time (15 / 30 / 60 s or custom), words (10 / 25 / 50 / 100
+//            or custom; 0 = no end), quote (public-domain quotes, short → thicc) or zen (no text, no clock); a word pack (English, Português, GDScript, mcfunction — packs/) and the
 //            punctuation / numbers switches. Bests and "your usual" only compare the same kind of test.
 //   pairs  — Weak pairs: real words packed with your slowest / most-missed letter pairs.
 //   clean  — Clean run: words keep coming while you're right; the first wrong key ends it.
@@ -16,6 +16,7 @@ import { createTyper, MIN_RUN_CHARS } from './typing-engine.js';
 import { makeSource } from './typing-source.js';
 import { SOUNDS, readSound, saveSound, playKey, unlockSound } from './typing-sound.js';
 import { PACKS, PACK_LIST } from './packs/index.js';
+import { QUOTES, QUOTE_GROUPS, groupOf } from './packs/quotes.js';
 import { words, pairText } from './typing-words.js';
 import { allRuns, weakKeys, runChart, drawChart } from './typing-history.js';
 import { drawKeyboard, legendHtml, currentLayout, setLayout, detectLayout, codeFor, resetFingers, LAYOUTS } from './keyboard.js';
@@ -30,7 +31,38 @@ const LENGTHS = [15, 30, 60];
 const WORD_COUNTS = [10, 25, 50, 100];
 const LS_LEN = 'skilltrainers.typing.len';
 const LS_OPTS = 'skilltrainers.typing.opts';
-const KINDS = [['time', 'time'], ['words', 'words'], ['zen', 'zen']];
+const KINDS = [['time', 'time'], ['words', 'words'], ['quote', 'quote'], ['zen', 'zen']];
+const QUOTE_LENS = ['all', ...QUOTE_GROUPS];
+const WRENCH = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>';
+const MAX_SECONDS = 24 * 3600, MAX_WORDS = 10000;
+
+/** Countdown text: 45 → "45", 125 → "2:05", 3725 → "1:02:05". */
+const clock = s => {
+  s = Math.max(0, Math.ceil(s));
+  if (s < 100) return String(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`;
+};
+/** Short length name: 45 → "45 s", 120 → "2m", 5400 → "1h30m". */
+export const durLabel = s => {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return !h && !m ? `${x} s` : `${h ? h + 'h' : ''}${m ? m + 'm' : ''}${x ? x + 's' : ''}`;
+};
+/** Long name for the custom box: "1 hour 30 minutes". */
+const durWords = s => {
+  if (!s) return 'no end';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  const part = (n, w) => (n ? `${n} ${w}${n === 1 ? '' : 's'}` : '');
+  return [part(h, 'hour'), part(m, 'minute'), part(x, 'second')].filter(Boolean).join(' ');
+};
+/** "90", "90s", "2m", "1h30m", "1h 5m 10s" → seconds; null if it isn't a time. */
+const parseDur = str => {
+  const t = str.trim().toLowerCase();
+  if (/^\d+$/.test(t)) return Number(t);
+  const m = t.match(/^(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?$/);
+  if (!t || !m) return null;
+  return Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0);
+};
 const PAIRS_SECONDS = 45;
 const FALLBACK_PAIRS = ['th', 'er', 'in', 'ou'];
 
@@ -43,17 +75,22 @@ const TIPS = [
 ];
 const PHONE_TIP = 'On the phone: two thumbs, and skip the suggestion bar.';
 
-const readLen = () => { try { return Number(localStorage.getItem(LS_LEN)) || 30; } catch { return 30; } };
+const readLen = () => {
+  try { const v = localStorage.getItem(LS_LEN), n = v == null ? NaN : Number(v); return Number.isInteger(n) && n >= 0 ? n : 30; } catch { return 30; }
+};
 const saveLen = v => { try { localStorage.setItem(LS_LEN, String(v)); } catch { /* fine */ } };
 const readOpts = () => { try { return JSON.parse(localStorage.getItem(LS_OPTS)) || {}; } catch { return {}; } };
 const saveOpts = o => { try { localStorage.setItem(LS_OPTS, JSON.stringify(o)); } catch { /* fine */ } };
 
 /** Which tests are "the same kind" (for bests and your usual): kind, length, pack, punctuation, numbers. */
-export const testKey = r => (r.kind === 'zen' ? 'zen' : `${r.kind || 'time'}|${r.len}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
+export const testKey = r => (r.kind === 'zen' ? 'zen'
+  : r.kind === 'quote' ? `quote|${r.ql}|${r.pack || 'en'}`
+  : `${r.kind || 'time'}|${r.len}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
 /** "30 s", "25 words · GDScript", "zen · Português · punctuation" */
 export function testLabel(r) {
   const k = r.kind || 'time';
-  const parts = [k === 'zen' ? 'zen' : k === 'words' ? `${r.len} words` : `${r.len} s`];
+  const parts = [k === 'zen' ? 'zen' : k === 'quote' ? `${r.ql} quote`
+    : k === 'words' ? (r.len ? `${r.len} words` : 'endless words') : (r.len ? durLabel(r.len) : 'endless time')];
   if (r.pack && r.pack !== 'en') parts.push((PACKS[r.pack] || {}).name || r.pack);
   if (r.p) parts.push('punctuation');
   if (r.n) parts.push('numbers');
@@ -103,18 +140,25 @@ export default {
     const done = []; // runs from this visit
     const saved = readOpts();
     let kind = ['time', 'words', 'zen'].includes(saved.kind) ? saved.kind : 'time';
-    let len = LENGTHS.includes(readLen()) ? readLen() : 30;
-    let wordCount = WORD_COUNTS.includes(saved.words) ? saved.words : 25;
+    let len = readLen(); // any whole number of seconds; 0 = no end
+    let wordCount = Number.isInteger(saved.words) && saved.words >= 0 ? saved.words : 25; // 0 = no end
+    let quoteLen = QUOTE_LENS.includes(saved.quote) ? saved.quote : 'all';
+    let quote = null, quoteWords = 0;
     let pack = PACKS[saved.pack] ? saved.pack : 'en';
     let punct = !!saved.punct, nums = !!saved.nums;
     let source = null;
-    const remember = () => saveOpts({ kind, words: wordCount, pack, punct, nums });
+    const remember = () => saveOpts({ kind, words: wordCount, pack, punct, nums, quote: quoteLen });
+    /** A test with no end (custom 0): Done, Shift+Enter or Esc finishes it. */
+    const endless = () => mode === 'test' && ((kind === 'time' && !len) || (kind === 'words' && !wordCount));
+    const canEnd = () => mode === 'test' && (kind === 'zen' || endless());
     /** The settings of the test about to be typed, in the shape runs are saved in. */
     const current = () => ({
       kind, len: kind === 'time' ? len : kind === 'words' ? wordCount : undefined,
-      // Zen has no words to copy, so no pack and no switches.
+      // Zen has no words to copy, so no pack and no switches; quotes bring their own punctuation.
       pack: kind === 'zen' ? undefined : pack,
-      p: kind !== 'zen' && punct && !PACKS[pack].code, n: kind !== 'zen' && nums && !PACKS[pack].code,
+      ql: kind === 'quote' ? (quote ? groupOf(quote.t) : quoteLen) : undefined,
+      p: kind !== 'zen' && kind !== 'quote' && punct && !PACKS[pack].code,
+      n: kind !== 'zen' && kind !== 'quote' && nums && !PACKS[pack].code,
     });
     let focusPairs = null, usingFallback = false;
     let tipIndex = Math.floor(Math.random() * TIPS.length);
@@ -161,13 +205,14 @@ export default {
     }
 
     const typer = createTyper(stage, {
-      get seconds() { return mode === 'test' ? (kind === 'time' ? len : null) : mode === 'pairs' ? PAIRS_SECONDS : mode === 'learn' ? 60 : null; },
+      get seconds() { return mode === 'test' ? (kind === 'time' ? len || null : null) : mode === 'pairs' ? PAIRS_SECONDS : mode === 'learn' ? 60 : null; },
       get more() {
         if (mode === 'pairs') return null;
-        if (mode === 'test') return kind === 'time' ? () => ' ' + source(40) : null;
+        if (mode === 'test') return kind === 'time' || (kind === 'words' && !wordCount) ? () => ' ' + source(40) : null;
         return () => ' ' + words(40);
       },
       get zen() { return mode === 'test' && kind === 'zen'; },
+      get canEnd() { return canEnd(); },
       stopOnError: mode === 'clean',
       onCaret(ch) {
         if (mode !== 'learn') return;
@@ -186,11 +231,13 @@ export default {
         saveKnown(known);
       },
       onType(k) { playKey(sound, k); },
-      onStart() { hint.hidden = true; lens.classList.add('dim'); setFocus(true); doneBtn.hidden = !(mode === 'test' && kind === 'zen'); },
+      onStart() { hint.hidden = true; lens.classList.add('dim'); setFocus(true); doneBtn.hidden = !canEnd(); },
       onTick({ left: l, wpm, chars, words: w, elapsed }) {
-        left.textContent = l != null ? Math.ceil(l)
-          : mode === 'test' && kind === 'words' ? `${w}/${wordCount}`
-          : mode === 'test' && kind === 'zen' ? `${Math.floor(elapsed)} s` : '';
+        left.textContent = l != null ? clock(l)
+          : mode !== 'test' ? ''
+          : kind === 'words' ? (wordCount ? `${w}/${wordCount}` : `${w}`)
+          : kind === 'quote' ? `${w}/${quoteWords}`
+          : clock(Math.floor(elapsed)); // zen, or time with no end: time so far
         live.textContent = mode === 'clean' ? `${Math.round(wpm)} wpm · ${chars} clean` : ` · ${Math.round(wpm)} wpm`;
       },
       onDone(run) {
@@ -205,7 +252,8 @@ export default {
             const c = current();
             rec.kind = c.kind;
             if (c.pack) rec.pack = c.pack;
-            if (c.len) rec.len = c.len;
+            if (c.len != null) rec.len = c.len;
+            if (c.ql) { rec.ql = c.ql; rec.by = quote.by; }
             if (c.p) rec.p = true;
             if (c.n) rec.n = true;
           }
@@ -228,7 +276,10 @@ export default {
 
     // ---------- what each mode shows before you start ----------
     function startHint() {
-      if (mode === 'test' && kind === 'zen') return `Type anything you like: no words to copy, no clock. ${onPhone ? 'Tap Done' : 'Shift+Enter (or Done)'} when you're finished.`;
+      const stopKeys = onPhone ? 'Tap Done' : 'Shift+Enter, Esc or Done';
+      if (mode === 'test' && kind === 'zen') return `Type anything you like: no words to copy, no clock. ${stopKeys} when you're finished.`;
+      if (endless()) return `No end: type as long as you like. ${stopKeys} when you're finished.`;
+      if (mode === 'test' && kind === 'quote') return 'Type the quote. Who said it shows at the end.';
       if (mode === 'test' && kind === 'words') return `Type the ${wordCount} words. The clock starts on your first key.`;
       if (mode === 'test') return 'Tap the words (or just start typing). The clock starts on your first key.';
       if (mode === 'clean') return 'Type as cleanly as you can. Words keep coming until the first wrong key.';
@@ -246,10 +297,19 @@ export default {
       const chip = (attr, val, label, on) => `<button type="button" class="chip${on ? ' on' : ''}" ${attr}="${val}">${label}</button>`;
       lens.innerHTML = `
         <div class="ty-seg">${KINDS.map(([k, label]) => chip('data-kind', k, label, k === kind)).join('')}</div>
-        ${kind === 'time' ? `<div class="ty-seg">${LENGTHS.map(v => chip('data-len', v, v + ' s', v === len)).join('')}</div>` : ''}
-        ${kind === 'words' ? `<div class="ty-seg">${WORD_COUNTS.map(v => chip('data-count', v, v, v === wordCount)).join('')}</div>` : ''}
-        ${kind !== 'zen' ? `<select class="ty-pack" data-pack aria-label="Word pack">${PACK_LIST.map(P => `<option value="${P.id}"${P.id === pack ? ' selected' : ''}>${P.name}</option>`).join('')}</select>` : ''}
-        ${kind !== 'zen' && !code ? `<div class="ty-seg">${chip('data-flag', 'punct', 'punctuation', punct)}${chip('data-flag', 'nums', 'numbers', nums)}</div>` : ''}`;
+        ${kind === 'time' ? `<div class="ty-seg">${LENGTHS.map(v => chip('data-len', v, v + ' s', v === len)).join('')}${customChip('time')}</div>` : ''}
+        ${kind === 'words' ? `<div class="ty-seg">${WORD_COUNTS.map(v => chip('data-count', v, v, v === wordCount)).join('')}${customChip('words')}</div>` : ''}
+        ${kind === 'quote' ? `<div class="ty-seg">${QUOTE_LENS.map(v => chip('data-qlen', v, v, v === quoteLen)).join('')}</div>` : ''}
+        ${kind !== 'zen' ? `<select class="ty-pack" data-pack aria-label="Word pack">${PACK_LIST.filter(P => kind !== 'quote' || QUOTES[P.id]).map(P => `<option value="${P.id}"${P.id === pack ? ' selected' : ''}>${P.name}</option>`).join('')}</select>` : ''}
+        ${kind !== 'zen' && kind !== 'quote' && !code ? `<div class="ty-seg">${chip('data-flag', 'punct', 'punctuation', punct)}${chip('data-flag', 'nums', 'numbers', nums)}</div>` : ''}`;
+    }
+
+    /** The wrench: opens the custom box; shows the custom amount when one is in use. */
+    function customChip(which) {
+      const isTime = which === 'time';
+      const on = isTime ? !LENGTHS.includes(len) : !WORD_COUNTS.includes(wordCount);
+      const val = isTime ? (len ? durLabel(len) : '∞') : (wordCount || '∞');
+      return `<button type="button" class="chip ty-custom${on ? ' on' : ''}" data-custom="${which}" aria-label="Custom ${isTime ? 'time' : 'word amount'}" title="Custom ${isTime ? 'time' : 'word amount'}">${WRENCH}${on ? `<span>${val}</span>` : ''}</button>`;
     }
 
     function nextTip() {
@@ -270,10 +330,17 @@ export default {
         focusPairs = mine || FALLBACK_PAIRS;
         const { text, marks } = pairText(focusPairs);
         typer.reset(text, marks);
+      } else if (mode === 'test' && kind === 'quote') {
+        if (!QUOTES[pack]) pack = 'en';
+        const list = QUOTES[pack].filter(q => quoteLen === 'all' || groupOf(q.t) === quoteLen);
+        let q;
+        do q = list[Math.floor(Math.random() * list.length)]; while (list.length > 1 && q === quote);
+        quote = q; quoteWords = q.t.split(' ').length;
+        typer.reset(q.t);
       } else if (mode === 'test') {
         const c = current();
         source = makeSource({ pack, punct: c.p, nums: c.n });
-        typer.reset(kind === 'zen' ? '' : source(kind === 'words' ? wordCount : 60));
+        typer.reset(kind === 'zen' ? '' : source(kind === 'words' && wordCount ? wordCount : 60));
       } else {
         typer.reset(words(60));
       }
@@ -281,7 +348,9 @@ export default {
       drawUnder();
       hint.textContent = startHint();
       hint.hidden = false;
-      left.textContent = mode === 'test' ? (kind === 'time' ? len : kind === 'words' ? `0/${wordCount}` : '') : mode === 'pairs' ? PAIRS_SECONDS : '';
+      left.textContent = mode === 'test'
+        ? (kind === 'time' ? (len ? clock(len) : '') : kind === 'words' ? (wordCount ? `0/${wordCount}` : '') : kind === 'quote' ? `0/${quoteWords}` : '')
+        : mode === 'pairs' ? PAIRS_SECONDS : '';
       nextTip();
       typer.focus();
     }
@@ -293,7 +362,7 @@ export default {
      *  Clean run = most clean words. Same device only. Zen has no best. */
     function bestLine(run) {
       if (mode !== 'test' && mode !== 'clean') return '';
-      if (mode === 'test' && kind === 'zen') return '';
+      if (mode === 'test' && (kind === 'zen' || endless())) return '';
       const key = testKey(current());
       const before = [...past, ...done.slice(0, -1)].filter(r => (r.m || 'test') === mode && (mode !== 'test' || testKey(r) === key));
       if (mode === 'clean') {
@@ -389,6 +458,7 @@ export default {
             <span><b>${Math.round(run.raw)}</b> raw</span>
             <span><b>${run.fixes}</b> ${run.fixes === 1 ? 'fix' : 'fixes'}</span>
           </div>
+          ${mode === 'test' && kind === 'quote' && quote ? `<p class="ty-by">${quote.by}</p>` : ''}
           ${bestLine(run)}
           ${runBlock(run)}
           ${mode === 'pairs' ? pairLine(run) : trickiest(run.keys)}
@@ -402,8 +472,10 @@ export default {
     }
 
     lens.addEventListener('click', e => {
-      const b = e.target.closest('[data-len], [data-count], [data-kind], [data-flag]');
+      const b = e.target.closest('[data-len], [data-count], [data-kind], [data-flag], [data-qlen], [data-custom]');
       if (!b || typer.running) return;
+      if (b.dataset.custom) { openCustom(b.dataset.custom); return; }
+      if (b.dataset.qlen) quoteLen = b.dataset.qlen;
       if (b.dataset.len) { len = Number(b.dataset.len); saveLen(len); }
       if (b.dataset.count) wordCount = Number(b.dataset.count);
       if (b.dataset.kind) kind = b.dataset.kind;
@@ -419,6 +491,52 @@ export default {
       fresh();
     });
     doneBtn.addEventListener('click', () => typer.stop());
+
+    // ---------- custom time / word amount (the wrench) ----------
+    function openCustom(which) {
+      const isTime = which === 'time';
+      sheet.hidden = false;
+      sheet.innerHTML = `
+        <div class="kb-panel snd-panel" role="dialog" aria-label="${isTime ? 'Test duration' : 'Custom word amount'}">
+          <div class="kb-head">
+            <h2>${isTime ? 'Test duration' : 'Custom word amount'}</h2>
+            <button type="button" class="ghost" data-close>Close</button>
+          </div>
+          <p class="cus-now" data-now></p>
+          <input class="cus-in" data-in type="text" inputmode="${isTime ? 'text' : 'numeric'}" autocomplete="off" autocapitalize="off" spellcheck="false"
+            value="${isTime ? (len ? durLabel(len).replace(' ', '') : '0') : wordCount}" aria-label="${isTime ? 'Duration' : 'Words'}">
+          <p class="fine">${isTime ? 'Seconds, or use “h” for hours and “m” for minutes, like “1h30m” or “2m”.<br>' : ''}Put 0 for a test with no end: ${onPhone ? 'tap Done' : 'press Shift+Enter, Esc or Done'} when you want to stop.</p>
+          <button type="button" class="btn go" data-apply>Apply</button>
+        </div>`;
+      const inp = sheet.querySelector('[data-in]'), now = sheet.querySelector('[data-now]'), applyBtn = sheet.querySelector('[data-apply]');
+      const read = () => {
+        const t = inp.value.trim();
+        if (isTime) { const s = parseDur(t); return s != null && s <= MAX_SECONDS ? s : null; }
+        return /^\d+$/.test(t) && Number(t) <= MAX_WORDS ? Number(t) : null;
+      };
+      const show = () => {
+        const v = read();
+        now.textContent = v == null ? (isTime ? 'That doesn’t look like a time (up to 24h).' : 'Just a whole number, please (up to 10000).')
+          : isTime ? durWords(v) : v === 0 ? 'no end' : `${v} ${v === 1 ? 'word' : 'words'}`;
+        now.classList.toggle('bad', v == null);
+        applyBtn.disabled = v == null;
+      };
+      const apply = () => {
+        const v = read();
+        if (v == null) return;
+        if (isTime) { len = v; saveLen(len); } else wordCount = v;
+        remember();
+        closeSheet();
+        fresh();
+      };
+      inp.addEventListener('input', show);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
+      applyBtn.addEventListener('click', apply);
+      sheet.querySelector('[data-close]').addEventListener('click', closeSheet);
+      sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+      show();
+      inp.focus(); inp.select();
+    }
 
     // ---------- the full chart, one tap away ----------
     function openSheet() {
@@ -494,7 +612,7 @@ export default {
       if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
       if (typer.running && e.key !== 'Escape' && e.key !== 'Tab') setFocus(true);
       if (e.key === 'Tab' || (e.key === 'Enter' && !result.hidden)) { e.preventDefault(); fresh(); }
-      else if (e.key === 'Escape') fresh();
+      else if (e.key === 'Escape') { if (typer.running && canEnd()) typer.stop(); else fresh(); }
     }
     document.addEventListener('keydown', onKey);
 

@@ -13,10 +13,11 @@ let shownDevice = null; // remembered while the page is open
 let shownGroup = null;  // which kind of test the graph shows
 
 /** Tests are graphed per group: kind (time / words / zen) + pack + switches. Lengths share a graph. */
-const groupKey = r => (r.kind === 'zen' ? 'zen|-|00' : `${r.kind || 'time'}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
+const groupKey = r => (r.kind === 'zen' ? 'zen|-|00' : r.kind === 'quote' ? `quote|${r.pack || 'en'}|00`
+  : `${r.kind || 'time'}|${r.pack || 'en'}|${r.p ? 1 : 0}${r.n ? 1 : 0}`);
 function groupLabel(key) {
   const [kind, pack, f] = key.split('|');
-  return [kind === 'time' ? 'Time' : kind === 'words' ? 'Words' : 'Zen', kind === 'zen' ? '' : PACK_NAME[pack] || pack,
+  return [kind === 'time' ? 'Time' : kind === 'words' ? 'Words' : kind === 'quote' ? 'Quote' : 'Zen', kind === 'zen' ? '' : PACK_NAME[pack] || pack,
     f[0] === '1' ? 'punctuation' : '', f[1] === '1' ? 'numbers' : ''].filter(Boolean).join(' · ');
 }
 
@@ -101,7 +102,8 @@ export function renderTypingHistory(el, sessions, source) {
             <li class="sess-row">
               <span class="when">${dayFmt.format(r.at)}<small>${timeFmt.format(r.at)}</small></span>
               <span>${(r.m || 'test') === 'test' && r.kind === 'zen' ? 'Zen' : MODE[r.m || 'test'] || r.m}${r.pack && r.pack !== 'en' ? `<small>${PACK_NAME[r.pack] || r.pack}</small>` : ''}</span>
-              <span class="num">${r.m === 'clean' ? (r.words || 0) + ' w' : r.kind === 'words' ? r.len + ' w' : r.len ? r.len + ' s' : ''}</span>
+              <span class="num">${r.m === 'clean' ? (r.words || 0) + ' w' : r.kind === 'quote' ? r.ql || '' : r.kind === 'zen' ? ''
+                : r.kind === 'words' ? (r.len ? r.len + ' w' : '∞ w') : r.len ? r.len + ' s' : r.len === 0 ? '∞' : ''}</span>
               <span class="num">${Math.round(r.wpm)}</span>
               <span class="num">${Math.round(r.acc * 100)}%</span>
             </li>`).join('')}
@@ -119,7 +121,8 @@ export function renderTypingHistory(el, sessions, source) {
 }
 
 const MODE_LONG = { test: 'test', pairs: 'Weak pairs', clean: 'Clean run', learn: 'Learn the keys' };
-const runLabel = r => (r.kind === 'zen' ? 'zen' : r.kind === 'words' ? `${r.len} words` : `${r.len} s ${MODE_LONG[r.m || 'test']}`)
+const runLabel = r => (r.kind === 'zen' ? 'zen' : r.kind === 'quote' ? `${r.ql} quote` : r.kind === 'words' ? (r.len ? `${r.len} words` : 'endless words')
+  : r.len ? `${r.len} s ${MODE_LONG[r.m || 'test']}` : r.len === 0 ? 'endless time' : MODE_LONG[r.m || 'test'])
   + (r.pack && r.pack !== 'en' ? ` · ${PACK_NAME[r.pack] || r.pack}` : '') + (r.p ? ' · punctuation' : '') + (r.n ? ' · numbers' : '');
 
 /** History: one dot per Test run. Hover/tap a dot for how that run went. */
@@ -186,10 +189,12 @@ export function runChart(run, W) {
     const yy = y(v).toFixed(1);
     out.push(`<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"/>`, `<text class="ax" x="${m.l - 6}" y="${yy}" dy="0.32em" text-anchor="end">${v}</text>`);
   }
-  const every = N > 40 ? 10 : N > 16 ? 5 : N > 8 ? 2 : 1;
+  // About a dozen labels at most, at round steps (long custom tests can have thousands of seconds).
+  const every = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].find(s => N / s <= 12) || 7200;
+  const secName = n => (N > 120 ? `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}` : n);
   for (let i = 0; i < N; i++) {
     if ((i + 1) % every) continue;
-    out.push(`<text class="ax" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${i + 1}</text>`);
+    out.push(`<text class="ax" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${secName(i + 1)}</text>`);
   }
   const line = a => a.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   out.push(`<polyline class="raw" points="${line(sec.raw)}"/>`, `<polyline class="trend" points="${line(sec.wpm)}"/>`);
