@@ -1,6 +1,6 @@
 # Plan: Trivia, packs + Mix
 
-Status: **planned (05/11), nothing built.** Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
+Status: **stage 1 done + live (05/11).** Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
 Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/typing.js` (how a trainer mounts), `js/store.js` (sessions), `trainers/packs/` (one file per pack).
 
 ## Leo's decisions (05/11)
@@ -17,7 +17,7 @@ Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/ty
 - **Play any length**, like the other trainers. There are no rounds you must finish; a calm "that's 20, stopping is a good call" now and then.
 - **No points, streaks or guilt.** The feedback names concrete things ("Geography: 7 of 10 from memory").
 
-## Stage 1: the trainer + Mix + Minecraft pack
+## Stage 1 ✅: the trainer + Mix + Minecraft pack (62 questions)
 - New trainer `trainers/trivia.js` (+ `trivia-engine.js` for matching), added to `trainers/index.js`.
 - **Mix screen:** pack chips to tick (remembered per device), then Start. Packs not built yet show as "coming".
 - **Question screen:**

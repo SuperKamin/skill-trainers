@@ -11,6 +11,7 @@ Plain static files, no build step, hosted on GitHub Pages: **pushing to `main` i
 | **Reaction** | one mode (the test) | `research/reaction.md` (6 practice modes suggested, none built yet) |
 | **Notes** (name a note against C) | Test · Easy · Twin notes · Listen | `research/notes.md` |
 | **Typing** | Test (time / words with custom amounts, 0 = no end · quote · zen · packs · punctuation / numbers) · Weak pairs · Clean run · Learn the keys | `research/typing.md`, `research/fingers.md` |
+| **Trivia** (general knowledge, in packs) | Mix (tick packs; type, choices if stuck, "how sure?", the answer + one line). Packs: Minecraft (more coming: `plans/trivia-packs-mix.md`) | `research/trivia.md` |
 | *Memory* (next candidate) | — | `research/memory.md` (recommends "Number Climb" first) |
 
 ## How a trainer is made (the recipe, from Leo — 04/10)

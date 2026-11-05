@@ -435,3 +435,61 @@ body.ty-focus { cursor: none; }
 .kb-pick { display: flex; gap: 0.6rem; align-items: center; color: var(--dim); }
 .kb-pick select { font: inherit; color: var(--paper); background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.5rem; }
 .kb-panel .fine b { color: var(--paper); }
+
+/* ---------- Trivia ---------- */
+.tv {
+  position: fixed; inset: 0; overflow-y: auto; background: var(--ink);
+  padding: calc(3.5rem + var(--safe-t)) calc(16px + var(--safe-r)) calc(1.5rem + var(--safe-b)) calc(16px + var(--safe-l));
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.tv-in-wrap { width: 100%; max-width: 560px; margin: auto 0; }
+.tv input, .tv-q, .tv-answer, .tv-note { user-select: text; -webkit-user-select: text; }
+.tv-setup, .tv-card { display: grid; gap: 0.8rem; }
+.tv-h { font-family: var(--display); font-weight: 900; font-size: clamp(2.6rem, 12vw, 4rem); line-height: 0.9; margin: 0 0 0.4rem; }
+.tv-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.tv-chips .chip { min-height: 40px; }
+.chip small { opacity: 0.7; font-size: 0.75em; margin-left: 0.2rem; }
+.tv-soon { opacity: 0.45; cursor: default; }
+.tv-start { justify-self: start; min-width: 8rem; justify-content: center; margin-top: 0.4rem; }
+.tv-tip { color: var(--dim); font-size: 0.85rem; margin: 0.4rem 0 0; }
+.tv-pack { color: var(--go); }
+.tv-q { font-size: clamp(1.35rem, 5vw, 1.8rem); line-height: 1.25; margin: 0; font-weight: 700; }
+.tv-q.small { font-size: 1rem; font-weight: 400; color: var(--dim); }
+.tv-form { display: flex; gap: 0.5rem; }
+.tv-input {
+  flex: 1; min-width: 0; min-height: 48px; padding: 0.5rem 0.9rem; font: inherit; font-size: 1.15rem;
+  color: var(--paper); background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+}
+.tv-input:focus { outline: 2px solid var(--go); outline-offset: 1px; }
+.tv-nudge:empty { display: none; }
+.tv-nudge { margin: 0; }
+.tv-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; }
+.tv-row .btn.go { margin-left: auto; min-width: 7rem; justify-content: center; }
+.tv-choices { display: grid; gap: 0.5rem; }
+.tv-choice, .tv-sure-b {
+  display: flex; align-items: center; gap: 0.7rem; min-height: 50px; padding: 0.5rem 0.9rem; text-align: left;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; cursor: pointer; font-size: 1.05rem;
+}
+.tv-choice:hover, .tv-sure-b:hover { border-color: var(--dim); }
+.tv kbd {
+  font-family: var(--body); font-size: 0.75rem; color: var(--dim); border: 1px solid var(--line);
+  border-radius: 6px; padding: 0.05rem 0.4rem; min-width: 1.5rem; text-align: center;
+}
+.tv-sure { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; outline: none; }
+.tv-sure-b { justify-content: center; }
+.tv-given { margin: 0; color: var(--dim); }
+.tv-given b { color: var(--paper); }
+.tv-given s { color: var(--miss); text-decoration-thickness: 1px; }
+.tv-head { margin: 0.2rem 0 0; font-size: 1.1rem; }
+.tv-reveal.ok .tv-head { color: var(--go); }
+.tv-answer { font-family: var(--display); font-weight: 900; font-size: clamp(2.4rem, 11vw, 3.8rem); line-height: 0.95; margin: 0; overflow-wrap: anywhere; }
+.tv-note { margin: 0; line-height: 1.45; font-size: 1.05rem; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0.8rem 0.9rem; }
+.tv-pause { margin: 0; }
+@media (hover: none) { .tv kbd { display: none; } }
+
+.tv-hist { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+.tv-hist li { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0.6rem 0.8rem; display: grid; gap: 0.2rem; }
+.tv-hist li span { color: var(--dim); font-size: 0.9rem; }
+.tv-hist-h { margin: 1.4rem 0 0; font-weight: 400; }
+.tv-surprise li span { color: var(--paper); font-size: 0.95rem; }
+.tv-surprise li b { color: var(--go); }
