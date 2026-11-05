@@ -17,7 +17,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode: fine */ } };
 
-const LEVEL_NAME = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
+const LEVEL_NAME = { 1: 'Easy', 2: 'Medium', 3: 'Hard', 4: 'Extra hard' };
 
 const SURE = [
   { id: 'sure', label: 'Sure' },
@@ -42,8 +42,8 @@ export default {
     let picked = load(LS_PACKS, ['minecraft']).filter(id => packById(id));
     if (!picked.length) picked = ['minecraft'];
     let lang = load(LS_LANG, 'en') === 'pt' ? 'pt' : 'en';
-    let levels = load(LS_LEVELS, [1, 2, 3]).filter(n => LEVEL_NAME[n]);
-    if (!levels.length) levels = [1, 2, 3];
+    let levels = load(LS_LEVELS, [1, 2, 3, 4]).filter(n => LEVEL_NAME[n]);
+    if (!levels.length) levels = [1, 2, 3, 4];
 
     el.innerHTML = `<div class="tv" data-state="setup"><div class="tv-in-wrap" data-body></div></div>`;
     const root = el.querySelector('.tv');
@@ -67,7 +67,7 @@ export default {
           <span class="label">Packs</span>
           <div class="tv-chips">${chips}</div>
           <span class="label">Levels</span>
-          <div class="tv-chips">${[1, 2, 3].map(n =>
+          <div class="tv-chips">${[1, 2, 3, 4].map(n =>
             `<button type="button" class="chip${levels.includes(n) ? ' on' : ''}" data-level="${n}" aria-pressed="${levels.includes(n)}">${LEVEL_NAME[n]}</button>`).join('')}</div>
           <span class="label">Language</span>
           <div class="tv-chips">

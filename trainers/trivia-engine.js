@@ -9,7 +9,7 @@ export function norm(s) {
     .normalize('NFD').replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .replace(/[’'`´]/g, '')
-    .replace(/[^\p{L}\p{N}@#+.\-\s]/gu, ' ')
+    .replace(/[^\p{L}\p{N}@#$+.\-\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/[.,\-]+$/, '')         // "Creeper." = "Creeper"
@@ -37,7 +37,7 @@ export function distance(a, b, cap = 3) {
 }
 
 // How many typos a word of this length may have: none for short ones (and numbers).
-const allowed = s => (/^[\d\s.,\-+@#]+$/.test(s) ? 0 : s.length >= 9 ? 2 : s.length >= 5 ? 1 : 0);
+const allowed = s => (/^[\d\s.,\-+@#$]+$/.test(s) ? 0 : s.length >= 9 ? 2 : s.length >= 5 ? 1 : 0);
 
 /** Every accepted form of a question's answer: [{ shown, key }]. */
 export function accepted(q) {
@@ -45,6 +45,8 @@ export function accepted(q) {
   const add = (shown, raw = shown) => { const key = norm(raw); if (key && !out.some(o => o.key === key)) out.push({ shown, key }); };
   add(q.a.en); add(q.a.pt);
   for (const al of q.aliases || []) add(al);
+  // "Washington, D.C." also counts as "Washington": the part before ", " is enough.
+  for (const f of [q.a.en, q.a.pt]) if (/, /.test(f)) add(f, f.split(', ')[0]);
   return out;
 }
 
@@ -91,7 +93,7 @@ export function shuffle(arr) {
  * The order questions come in: never-seen ones first (shuffled), then the rest (shuffled).
  * `seen` = Set of "pack/id" already answered in past sessions; `levels` = which levels to include.
  */
-export function makeDeck(packs, seen, levels = [1, 2, 3]) {
+export function makeDeck(packs, seen, levels = [1, 2, 3, 4]) {
   const all = packs.flatMap(p => p.questions.filter(q => levels.includes(q.level || 2)).map(q => ({ pack: p, q, key: p.id + '/' + q.id })));
   const fresh = shuffle(all.filter(x => !seen.has(x.key)));
   const old = shuffle(all.filter(x => seen.has(x.key)));

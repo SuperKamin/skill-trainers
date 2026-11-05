@@ -1,6 +1,6 @@
 # Plan: Trivia, packs + Mix
 
-Status: **stage 1 done + live (05/11).** Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
+Status: **stages 1 + 2 done + live (05/11).** Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
 Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/typing.js` (how a trainer mounts), `js/store.js` (sessions), `trainers/packs/` (one file per pack).
 
 ## Leo's decisions (05/11)
@@ -34,7 +34,14 @@ Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/ty
 - **Technical Minecraft** is its own pack (redstone, commands, datapacks, how the game runs); he mixes packs when he wants.
 - **Levels**: every question is Easy / Medium / Hard; a Levels filter on the Mix screen (remembered; at least one stays on). Harder questions added: Minecraft 72 (21/29/22), Technical 30 (5/14/11). New packs must give every question a level.
 
-## Stage 2: Geography + Science (English + Português)
+## Leo's second play (05/11) ✅
+- Structure abbreviations count (bt, br, ec/es). The part before ", " counts too ("Washington").
+- **Extra hard** = level 4 (Minecraft +12, Technical +10). Levels filter has four chips.
+- "Facing coordinates" was a made-up wrong choice (Leo asked); local coordinates is right.
+
+## Stage 2 ✅: Geography + Science (English + Português)
+Built 05/11 by `tools/build_trivia.py` (run: `python tools/build_trivia.py`; Wikidata CC0, in small batches, since big joins time out). Geography 369 (capitals both ways for 188 countries with one capital, 26 Brazilian states by hand, 10 hand questions); Science 300 (118 elements: symbol ↔ name, atomic number for the better known; 20 hand questions on planets, the body, physics, animals). Levels from fame (sitelinks); wrong choices from things of similar fame. Brazilian Portuguese names first (pt-br), Portugal's kept as accepted answers; a few still show Portugal's spelling where Wikidata has no pt-br name (e.g. Quinxassa); the English name always counts.
+
 - `tools/build-trivia.mjs`, run once on this PC, **not in the browser**. It queries Wikidata (CC0) and writes the pack files.
   - Geography: capitals, continents, flags (as text), longest rivers, highest mountains, Brazilian states.
   - Science: element symbols and numbers, planets and moons, body, animals.

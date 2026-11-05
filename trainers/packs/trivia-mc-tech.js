@@ -2,7 +2,7 @@
 // Split from the Minecraft pack on Leo's ask (05/11): he mixes them when he wants.
 // Written for this app. Same shape as trivia-minecraft.js. Ids of moved questions keep their mc- prefix.
 
-// level: 1 = Easy, 2 = Medium, 3 = Hard (LEVELS at the bottom; 2 if not listed).
+// level: 1 = Easy, 2 = Medium, 3 = Hard, 4 = Extra hard (LEVELS at the bottom; 2 if not listed).
 const Q = (id, qEn, qPt, aEn, aPt, aliases, wrongEn, wrongPt, noteEn, notePt) => ({
   id, q: { en: qEn, pt: qPt }, a: { en: aEn, pt: aPt }, aliases,
   wrong: { en: wrongEn, pt: wrongPt || wrongEn }, note: { en: noteEn, pt: notePt },
@@ -137,10 +137,52 @@ const pack = {
       '.nbt', '.nbt', ['nbt'], ['.schem', '.json', '.mca'], null,
       'NBT means Named Binary Tag: the same format as item and entity data.',
       'NBT quer dizer Named Binary Tag: o mesmo formato dos dados de itens e entidades.'),
+    // ---------- extra hard (05/11) ----------
+    Q('tm-overworld-id', 'What is the Overworld\'s dimension ID?', 'Qual é o ID de dimensão da Superfície?',
+      'minecraft:overworld', 'minecraft:overworld', ['overworld'], ['minecraft:world', 'minecraft:the_overworld', 'minecraft:surface'], null,
+      'The other two are minecraft:the_nether and minecraft:the_end, with "the_" in front.',
+      'As outras duas são minecraft:the_nether e minecraft:the_end, com "the_" na frente.'),
+    Q('tm-deathcount', 'Which scoreboard criterion goes up by 1 every time a player dies?', 'Qual critério de placar sobe 1 toda vez que um jogador morre?',
+      'deathCount', 'deathCount', ['death count', 'minecraft.custom:minecraft.deaths', 'deaths'], ['playerKillCount', 'health', 'totalKillCount'], null,
+      'deathCount and minecraft.custom:minecraft.deaths count the same thing.',
+      'deathCount e minecraft.custom:minecraft.deaths contam a mesma coisa.'),
+    Q('tm-leave-game', 'Which stat criterion goes up when a player leaves the game?', 'Qual critério de estatística sobe quando um jogador sai do jogo?',
+      'minecraft.custom:minecraft.leave_game', 'minecraft.custom:minecraft.leave_game', ['leave_game', 'leave game', 'minecraft.leave_game'], ['minecraft.custom:minecraft.disconnect', 'minecraft.custom:minecraft.logout', 'minecraft.custom:minecraft.quit'], null,
+      'The usual rejoin check: give it a score, then reset it in a tick function after you react.',
+      'O jeito comum de detectar volta: dá a pontuação, reage, e reseta numa função de tick.'),
+    Q('tm-int-max', 'What is the biggest number a scoreboard score can hold?', 'Qual é o maior número que uma pontuação de placar consegue guardar?',
+      '2147483647', '2147483647', ['2,147,483,647', '2.147.483.647', '2^31-1', '2^31 - 1'], ['4294967295', '999999999', '9223372036854775807'], null,
+      'It\'s the biggest 32-bit signed integer. Add 1 more and it wraps around to -2147483648.',
+      'É o maior inteiro de 32 bits com sinal. Soma mais 1 e ele dá a volta pra -2147483648.'),
+    Q('tm-cramming', 'By default, how many entities can share one space before cramming damage starts?', 'Por padrão, quantas entidades podem dividir um espaço antes do dano por esmagamento começar?',
+      '24', '24', ['twenty four', 'vinte e quatro'], ['16', '32', '8'], null,
+      'The 25th entity in the space is when they start taking damage.',
+      'É na 25ª entidade no espaço que elas começam a levar dano.'),
+    Q('tm-nbt-bool', 'In NBT, which number type stores true / false (like 1b)?', 'No NBT, qual tipo de número guarda verdadeiro / falso (tipo 1b)?',
+      'Byte', 'Byte', ['bytes'], ['Short', 'Int', 'Long'], null,
+      'The letter after the number gives the type: b byte, s short, L long, f float, d double.',
+      'A letra depois do número dá o tipo: b byte, s short, L long, f float, d double.'),
+    Q('tm-macro', 'Which character starts a macro line in a .mcfunction file?', 'Qual caractere começa uma linha de macro num arquivo .mcfunction?',
+      '$', '$', ['dollar', 'dollar sign', 'cifrao'], ['#', '@', '%'], null,
+      'Macros came in 1.20.2: $(name) gets filled in from the data you call the function with.',
+      'As macros vieram na 1.20.2: o $(nome) é preenchido com os dados que você passa pra função.'),
+    Q('tm-fn-permission', 'What is the default permission level that functions run at?', 'Qual é o nível de permissão padrão em que as funções rodam?',
+      '2', '2', ['two', 'dois', 'level 2', 'nivel 2'], ['4', '1', '3'], null,
+      'Level 2 is the same as command blocks. A server can change it in server.properties.',
+      'Nível 2 é o mesmo dos blocos de comando. O servidor pode mudar no server.properties.'),
+    Q('tm-observer-pulse', 'How many game ticks long is an observer\'s pulse?', 'Quantos ticks de jogo dura o pulso de um observador?',
+      '2', '2', ['two', 'dois', '1 redstone tick', '2 ticks'], ['1', '4', '8'], null,
+      'That\'s one redstone tick: short enough that some components miss it.',
+      'É um tick de redstone: curto o bastante pra alguns componentes não perceberem.'),
+    Q('tm-tags-block', 'Since 1.21, which datapack folder holds block tags (inside tags/)?', 'Desde a 1.21, qual pasta do datapack guarda tags de bloco (dentro de tags/)?',
+      'block', 'block', ['tags/block', '/block'], ['blocks', 'block_tags', 'blocktags'], null,
+      'Same rename as functions → function: the folders under tags/ went singular too.',
+      'Mesma troca de functions → function: as pastas dentro de tags/ também ficaram no singular.'),
   ],
 };
 
 const LEVELS = {
+  'tm-overworld-id': 4, 'tm-deathcount': 4, 'tm-leave-game': 4, 'tm-int-max': 4, 'tm-cramming': 4, 'tm-nbt-bool': 4, 'tm-macro': 4, 'tm-fn-permission': 4, 'tm-observer-pulse': 4, 'tm-tags-block': 4,
   'mc-at-p': 1, 'mc-execute': 1, 'tm-at-e': 1, 'tm-chunk': 1, 'tm-tps': 1,
   'mc-bedrock-lang': 3, 'tm-local': 3, 'tm-push-limit': 3, 'tm-redstone-tick': 3, 'tm-qc': 3, 'tm-bud': 3,
   'tm-hopper-speed': 3, 'tm-random-tick': 3, 'tm-function-folder': 3, 'tm-region': 3, 'tm-nbt': 3,
