@@ -10,6 +10,7 @@
 
 import { PACKS, packById } from './packs/trivia-index.js';
 import { check, choices as makeChoices, makeDeck } from './trivia-engine.js';
+import { buildMemory, apply, dueList, KEEP } from './trivia-memory.js';
 
 const TIP = 'Tip: guess out loud before you look, even if it\'s a wild one.';
 const LS_PACKS = 'trivia.packs', LS_LANG = 'trivia.lang', LS_LEVELS = 'trivia.levels';
@@ -38,6 +39,11 @@ export default {
     const setStatus = ctx.setStatus || (() => {});
     const past = ctx.sessions || [];
     const seen = new Set(past.flatMap(s => (s.answers || []).filter(a => a && a.pack && a.id).map(a => a.pack + '/' + a.id)));
+    const mem = buildMemory(past);            // Coming back + kept (trivia-memory.js)
+    const askedNow = new Set();               // asked in this sitting: never twice in a row of play
+    // Missed questions due back, in the packs he picked (any level: a miss should come back even if he changed levels).
+    const dueNow = () => dueList(mem).filter(r => picked.includes(r.pack) && !askedNow.has(r.key) && packById(r.pack)
+      && packById(r.pack).questions.some(q => q.id === r.id));
 
     let picked = load(LS_PACKS, ['minecraft']).filter(id => packById(id));
     if (!picked.length) picked = ['minecraft'];
@@ -75,6 +81,7 @@ export default {
             <button type="button" class="chip${lang === 'pt' ? ' on' : ''}" data-lang="pt" aria-pressed="${lang === 'pt'}">Português</button>
           </div>
           <p class="fine">Answers count in either language.</p>
+          ${dueNow().length ? `<p class="tv-due">${dueNow().length} ${dueNow().length === 1 ? 'question is' : 'questions are'} coming back today. They'll be mixed in.</p>` : ''}
           <button type="button" class="btn go tv-start" data-start ${count ? '' : 'disabled'}>Start</button>
           ${picked.length && !count ? '<p class="fine">No questions at these levels in these packs yet.</p>' : ''}
           <p class="tv-tip">${TIP}</p>
@@ -108,14 +115,24 @@ export default {
 
     // ---------- one question ----------
     function ask() {
-      if (at >= deck.length) { deck = makeDeck(picked.map(packById).filter(Boolean), new Set(), levels); at = 0; }
-      cur = deck[at++];
+      // About 1 in 4 is a question coming back (research: spaced, successive relearning), while any are due.
+      const due = dueNow();
+      if (due.length && (answered % 4 === 1 || at >= deck.length)) {
+        const r = due[0], pack = packById(r.pack);
+        cur = { pack, q: pack.questions.find(q => q.id === r.id), key: r.key, coming: true };
+      } else {
+        do {
+          if (at >= deck.length) { deck = makeDeck(picked.map(packById).filter(Boolean), new Set(), levels); at = 0; }
+          cur = deck[at++];
+        } while (askedNow.has(cur.key) && askedNow.size < deck.length);
+      }
+      askedNow.add(cur.key);
       given = null;
       state = 'ask'; root.dataset.state = state;
       const q = cur.q;
       body.innerHTML = `
         <div class="tv-card">
-          <span class="label tv-pack">${esc(cur.pack.title[lang])}</span>
+          <span class="label tv-pack">${esc(cur.pack.title[lang])}${cur.coming ? ' · <span class="tv-back">Coming back</span>' : ''}</span>
           <p class="tv-q">${esc(q.q[lang])}</p>
           <form class="tv-form" data-form autocomplete="off">
             <input class="tv-input" data-input type="text" autocomplete="off" autocapitalize="off" autocorrect="off"
@@ -209,6 +226,7 @@ export default {
           ${given.counted ? `<p class="fine">Counted as: ${esc(given.counted)}</p>` : ''}
           ${q.note[lang] ? `<p class="tv-note">${esc(q.note[lang])}</p>` : ''}
           ${cur.pack.licence === 'CC BY-SA 4.0' ? `<p class="fine tv-credit">${esc(cur.pack.credit)}</p>` : ''}
+          <p class="fine tv-memo" data-memo></p>
           ${pause}
           <div class="tv-row">
             ${given.via === 'typed' && !given.ok ? '<button type="button" class="ghost" data-fix>I was right</button>' : ''}
@@ -216,6 +234,20 @@ export default {
           </div>
         </div>`;
       const card = body.querySelector('[data-card]');
+      // One plain line on what happens next with this question (no points: just where it stands).
+      function drawMemo() {
+        const key = pending.pack + '/' + pending.id;
+        const old = mem.get(key);
+        const tmp = new Map(old ? [[key, { ...old, days: [...old.days] }]] : []);
+        const what = apply(tmp, { ...pending, via: pending.fixed ? 'typed' : pending.via });
+        const r = tmp.get(key);
+        const line = {
+          kept: `Kept: from memory on ${KEEP} different days.`,
+          step: `From memory on ${r.days.length} of ${KEEP} different days. It comes back in ${r.days.length === 1 ? '3 days' : 'a week'}.`,
+          missed: 'It comes back tomorrow.',
+        }[what] || (old && old.kept && what === '' ? 'Still kept.' : '');
+        body.querySelector('[data-memo]').textContent = line;
+      }
       const verdict = body.querySelector('[data-verdict]');
       // Right = a clear win (Leo, 05/11): gold check, gold answer, a small pop. Wrong = a story, never a red X.
       function drawVerdict(ok, fixed) {
@@ -238,11 +270,13 @@ export default {
           ${given.via !== 'dunno' ? `<p class="tv-given">You ${given.via === 'choices' ? 'picked' : 'said'}: <s>${esc(given.text)}</s></p>` : ''}`;
       }
       drawVerdict(given.ok, false);
+      drawMemo();
       const fix = body.querySelector('[data-fix]');
       if (fix) fix.addEventListener('click', () => {
         pending.ok = true; pending.fixed = true;
         fix.remove();
         drawVerdict(true, true);
+        drawMemo();
         body.querySelector('[data-next]').focus({ preventScroll: true });
       });
       body.querySelector('[data-next]').addEventListener('click', next);
@@ -251,6 +285,7 @@ export default {
 
     function flushPending() {
       if (!pending) return;
+      apply(mem, { ...pending, via: pending.fixed ? 'typed' : pending.via });
       onResult({ answer: pending });
       pending = null;
     }

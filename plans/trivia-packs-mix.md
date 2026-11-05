@@ -1,6 +1,6 @@
 # Plan: Trivia, packs + Mix
 
-Status: **stages 1–3 done + live (05/11).** Stage 4 next: confirm with Leo first (new Firebase data). Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
+Status: **all four stages done + live (05/11).** Next, Leo's pick: the niche-answers mode, more packs, Extra hard for the big packs, the monthly outside check. Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
 Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/typing.js` (how a trainer mounts), `js/store.js` (sessions), `trainers/packs/` (one file per pack).
 
 ## Leo's decisions (05/11)
@@ -56,7 +56,10 @@ Built by `tools/build_trivia_general.py` (fetch cached in `tools/opentdb-general
 - A curated slice of **Open Trivia DB** (CC BY-SA 4.0), English only: ~300 questions, free-answer friendly ones only (e.g. not "which of these…").
 - It goes in its own file, `trivia-general.js`, marked **CC BY-SA 4.0** with credit to Open Trivia DB. The credit is also shown in the app (pack info).
 
-## Stage 4: Coming back + History
+## Stage 4 ✅: Coming back + History (05/11, Leo's direct yes)
+Built as `trainers/trivia-memory.js`, worked out from the answers sessions already save (`at` on each answer), so nothing new had to be added to the database. Missed (wrong / choices / no idea) → back next day, then 3 days, then a week; right from memory on 3 different days = **kept**; a later miss starts it over. Right the first time = known, doesn't come back. In play: about 1 in 4 is a "Coming back" question while any are due (from the packs he picked, any level); the Mix screen says how many are back today; after each answer one plain line says where that question stands. History: Kept / Learning / Back today tiles, last 7 days vs the week before (from memory, newly kept), kept + learning lists. Not done: rewording on return (packs have one wording each).
+
+### (original plan for stage 4)
 - **Coming back:** missed and from-choices questions return after ~1 day, ~3 days, ~1 week, **reworded where the pack has a second wording**. A question is **kept** after 3 right answers from memory on 3 different days. Mix leans a little toward due questions (about 1 in 4).
 - **History:** per pack, questions seen / kept / due; this week vs last; the misses that came back and were then got right. Shown as "here's what moved".
 - This is new data on Leo's Firebase account (per-question memory). Build it in the main conversation after Leo says yes directly.
