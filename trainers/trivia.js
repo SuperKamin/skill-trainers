@@ -59,7 +59,7 @@ export default {
       state = 'setup'; root.dataset.state = state;
       const chips = PACKS.map(p => p.coming
         ? `<button type="button" class="chip tv-soon" disabled>${esc(p.title[lang])} <small>coming</small></button>`
-        : `<button type="button" class="chip${picked.includes(p.id) ? ' on' : ''}" data-pack="${p.id}" aria-pressed="${picked.includes(p.id)}">${esc(p.title[lang])} <small>${p.questions.filter(q => levels.includes(q.level)).length}</small></button>`).join('');
+        : `<button type="button" class="chip${picked.includes(p.id) ? ' on' : ''}" data-pack="${p.id}" aria-pressed="${picked.includes(p.id)}">${esc(p.title[lang])} <small>${p.questions.filter(q => levels.includes(q.level)).length}${p.langs && !p.langs.includes(lang) ? ' · English' : ''}</small></button>`).join('');
       const count = picked.map(packById).filter(Boolean).reduce((n, p) => n + p.questions.filter(q => levels.includes(q.level)).length, 0);
       body.innerHTML = `
         <div class="tv-setup">
@@ -207,7 +207,8 @@ export default {
           <div data-verdict></div>
           <p class="tv-answer">${esc(right)}</p>
           ${given.counted ? `<p class="fine">Counted as: ${esc(given.counted)}</p>` : ''}
-          <p class="tv-note">${esc(q.note[lang])}</p>
+          ${q.note[lang] ? `<p class="tv-note">${esc(q.note[lang])}</p>` : ''}
+          ${cur.pack.licence === 'CC BY-SA 4.0' ? `<p class="fine tv-credit">${esc(cur.pack.credit)}</p>` : ''}
           ${pause}
           <div class="tv-row">
             ${given.via === 'typed' && !given.ok ? '<button type="button" class="ghost" data-fix>I was right</button>' : ''}

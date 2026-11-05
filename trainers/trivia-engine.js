@@ -47,6 +47,11 @@ export function accepted(q) {
   for (const al of q.aliases || []) add(al);
   // "Washington, D.C." also counts as "Washington": the part before ", " is enough.
   for (const f of [q.a.en, q.a.pt]) if (/, /.test(f)) add(f, f.split(', ')[0]);
+  // "Mount Elbrus" also counts as "Elbrus" (same for Monte / Lake / Lago).
+  for (const f of [...out]) {
+    const m = f.key.match(/^(mount|mt|monte|lake|lago) (.+)$/);
+    if (m) add(f.shown, m[2]);
+  }
   return out;
 }
 

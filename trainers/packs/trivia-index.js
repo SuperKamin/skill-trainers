@@ -4,9 +4,10 @@ import minecraft from './trivia-minecraft.js';
 import mcTech from './trivia-mc-tech.js';
 import geography from './trivia-geography.js';
 import science from './trivia-science.js';
+import general from './trivia-general.js';
 
 export const PACKS = [
-  { id: 'general', title: { en: 'General knowledge', pt: 'Conhecimentos gerais' }, coming: true },
+  general,
   geography,
   science,
   minecraft,

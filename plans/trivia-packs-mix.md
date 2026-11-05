@@ -1,6 +1,6 @@
 # Plan: Trivia, packs + Mix
 
-Status: **stages 1 + 2 done + live (05/11).** Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
+Status: **stages 1–3 done + live (05/11).** Stage 4 next: confirm with Leo first (new Firebase data). Leo's picks, 05/11. Build one stage at a time, like `typing-monkeytype.md`.
 Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/typing.js` (how a trainer mounts), `js/store.js` (sessions), `trainers/packs/` (one file per pack).
 
 ## Leo's decisions (05/11)
@@ -49,7 +49,10 @@ Built 05/11 by `tools/build_trivia.py` (run: `python tools/build_trivia.py`; Wik
 - **Language switch** on the Mix screen: English / Português (a pack without pt stays English).
 - Pogo reads a sample of each pack and fixes anything odd.
 
-## Stage 3: General knowledge
+## Stage 3 ✅: General knowledge (05/11)
+Built by `tools/build_trivia_general.py` (fetch cached in `tools/opentdb-general-raw.json`, so rebuilds are the same). 226 questions (115 easy · 81 medium · 30 hard), English only (chip says "· English" in Português mode). Pogo read every one: `tools/trivia-general-review.json` holds the drops (alcohol, US-only stats, full dates, sad news, dubious facts, ones that don't work typed), extra accepted answers and level fixes. No "one line" note (Open Trivia DB has none); the credit line shows instead. Matching learned: "Mount Elbrus" = "Elbrus"; number words = digits.
+
+### (original plan for stage 3)
 - A curated slice of **Open Trivia DB** (CC BY-SA 4.0), English only: ~300 questions, free-answer friendly ones only (e.g. not "which of these…").
 - It goes in its own file, `trivia-general.js`, marked **CC BY-SA 4.0** with credit to Open Trivia DB. The credit is also shown in the app (pack info).
 

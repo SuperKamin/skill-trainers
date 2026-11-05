@@ -509,3 +509,4 @@ body.ty-focus { cursor: none; }
 @keyframes tv-pop { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes tv-rise { 0% { transform: translateY(6px); opacity: 0.4; } 100% { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .tv-check, .tv-reveal.ok .tv-answer { animation: none; } }
+.tv-credit { margin: 0; font-size: 0.75rem; }
