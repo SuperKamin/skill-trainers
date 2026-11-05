@@ -493,3 +493,19 @@ body.ty-focus { cursor: none; }
 .tv-hist-h { margin: 1.4rem 0 0; font-weight: 400; }
 .tv-surprise li span { color: var(--paper); font-size: 0.95rem; }
 .tv-surprise li b { color: var(--go); }
+/* Trivia: a right answer is a clear win (Leo, 05/11). */
+.tv-reveal { border-left: 4px solid transparent; padding-left: 0.9rem; }
+.tv-reveal.ok { border-left-color: var(--go); }
+.tv-win { display: flex; align-items: center; gap: 0.7rem; margin: 0.2rem 0 0; }
+.tv-win > span:last-child { display: grid; font-family: var(--display); font-weight: 900; font-size: 2rem; line-height: 0.95; color: var(--go); }
+.tv-win small { font-family: var(--body); font-weight: 400; font-size: 0.85rem; color: var(--dim); letter-spacing: 0.02em; }
+.tv-check {
+  display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 50%;
+  background: var(--go); color: var(--go-ink); font-size: 1.5rem; font-weight: 700;
+  animation: tv-pop 0.45s cubic-bezier(.2, 1.6, .4, 1);
+}
+.tv-reveal.ok .tv-answer { color: var(--go); animation: tv-rise 0.35s ease-out; }
+.tv-sub { margin: 0; color: var(--paper); }
+@keyframes tv-pop { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes tv-rise { 0% { transform: translateY(6px); opacity: 0.4; } 100% { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tv-check, .tv-reveal.ok .tv-answer { animation: none; } }

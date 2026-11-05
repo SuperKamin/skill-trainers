@@ -12,10 +12,12 @@ import { PACKS, packById } from './packs/trivia-index.js';
 import { check, choices as makeChoices, makeDeck } from './trivia-engine.js';
 
 const TIP = 'Tip: guess out loud before you look, even if it\'s a wild one.';
-const LS_PACKS = 'trivia.packs', LS_LANG = 'trivia.lang';
+const LS_PACKS = 'trivia.packs', LS_LANG = 'trivia.lang', LS_LEVELS = 'trivia.levels';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode: fine */ } };
+
+const LEVEL_NAME = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
 
 const SURE = [
   { id: 'sure', label: 'Sure' },
@@ -40,6 +42,8 @@ export default {
     let picked = load(LS_PACKS, ['minecraft']).filter(id => packById(id));
     if (!picked.length) picked = ['minecraft'];
     let lang = load(LS_LANG, 'en') === 'pt' ? 'pt' : 'en';
+    let levels = load(LS_LEVELS, [1, 2, 3]).filter(n => LEVEL_NAME[n]);
+    if (!levels.length) levels = [1, 2, 3];
 
     el.innerHTML = `<div class="tv" data-state="setup"><div class="tv-in-wrap" data-body></div></div>`;
     const root = el.querySelector('.tv');
@@ -55,19 +59,24 @@ export default {
       state = 'setup'; root.dataset.state = state;
       const chips = PACKS.map(p => p.coming
         ? `<button type="button" class="chip tv-soon" disabled>${esc(p.title[lang])} <small>coming</small></button>`
-        : `<button type="button" class="chip${picked.includes(p.id) ? ' on' : ''}" data-pack="${p.id}" aria-pressed="${picked.includes(p.id)}">${esc(p.title[lang])} <small>${p.questions.length}</small></button>`).join('');
+        : `<button type="button" class="chip${picked.includes(p.id) ? ' on' : ''}" data-pack="${p.id}" aria-pressed="${picked.includes(p.id)}">${esc(p.title[lang])} <small>${p.questions.filter(q => levels.includes(q.level)).length}</small></button>`).join('');
+      const count = picked.map(packById).filter(Boolean).reduce((n, p) => n + p.questions.filter(q => levels.includes(q.level)).length, 0);
       body.innerHTML = `
         <div class="tv-setup">
           <h2 class="tv-h">Mix</h2>
           <span class="label">Packs</span>
           <div class="tv-chips">${chips}</div>
+          <span class="label">Levels</span>
+          <div class="tv-chips">${[1, 2, 3].map(n =>
+            `<button type="button" class="chip${levels.includes(n) ? ' on' : ''}" data-level="${n}" aria-pressed="${levels.includes(n)}">${LEVEL_NAME[n]}</button>`).join('')}</div>
           <span class="label">Language</span>
           <div class="tv-chips">
             <button type="button" class="chip${lang === 'en' ? ' on' : ''}" data-lang="en" aria-pressed="${lang === 'en'}">English</button>
             <button type="button" class="chip${lang === 'pt' ? ' on' : ''}" data-lang="pt" aria-pressed="${lang === 'pt'}">Português</button>
           </div>
           <p class="fine">Answers count in either language.</p>
-          <button type="button" class="btn go tv-start" data-start ${picked.length ? '' : 'disabled'}>Start</button>
+          <button type="button" class="btn go tv-start" data-start ${count ? '' : 'disabled'}>Start</button>
+          ${picked.length && !count ? '<p class="fine">No questions at these levels in these packs yet.</p>' : ''}
           <p class="tv-tip">${TIP}</p>
         </div>`;
       body.querySelectorAll('[data-pack]').forEach(b => b.addEventListener('click', () => {
@@ -75,6 +84,12 @@ export default {
         picked = picked.includes(id) ? picked.filter(x => x !== id) : [...picked, id];
         save(LS_PACKS, picked);
         drawSetup();
+      }));
+      body.querySelectorAll('[data-level]').forEach(b => b.addEventListener('click', () => {
+        const n = Number(b.dataset.level);
+        const nextLv = levels.includes(n) ? levels.filter(x => x !== n) : [...levels, n].sort();
+        if (!nextLv.length) return;   // at least one level stays on
+        levels = nextLv; save(LS_LEVELS, levels); drawSetup();
       }));
       body.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => {
         lang = b.dataset.lang; save(LS_LANG, lang); drawSetup();
@@ -86,13 +101,14 @@ export default {
     function start() {
       const packs = picked.map(packById).filter(Boolean);
       if (!packs.length) return;
-      deck = makeDeck(packs, seen); at = 0;
+      deck = makeDeck(packs, seen, levels); at = 0;
+      if (!deck.length) return;   // Start is disabled then anyway
       ask();
     }
 
     // ---------- one question ----------
     function ask() {
-      if (at >= deck.length) { deck = makeDeck(picked.map(packById).filter(Boolean), new Set()); at = 0; }
+      if (at >= deck.length) { deck = makeDeck(picked.map(packById).filter(Boolean), new Set(), levels); at = 0; }
       cur = deck[at++];
       given = null;
       state = 'ask'; root.dataset.state = state;
@@ -182,19 +198,13 @@ export default {
       };
       answered++;
       setStatus(answered + ' answered');
-      let head;
-      if (given.ok && given.via === 'typed') head = 'From memory.';
-      else if (given.ok) head = 'Right, from the choices.';
-      else if (given.via === 'dunno') head = 'Here it is.';
-      else if (sure === 'sure') head = 'Ooh, a surprise one. These are the ones that stick.';
-      else head = 'Not this time. Here it is.';
       const pause = answered % 20 === 0 ? `<p class="fine tv-pause">That's ${answered}. Stopping here is a good call too.</p>` : '';
+      const lvl = LEVEL_NAME[q.level] ? ` · ${LEVEL_NAME[q.level]}` : '';
       body.innerHTML = `
-        <div class="tv-card tv-reveal${given.ok ? ' ok' : ''}">
-          <span class="label tv-pack">${esc(cur.pack.title[lang])}</span>
+        <div class="tv-card tv-reveal" data-card>
+          <span class="label tv-pack">${esc(cur.pack.title[lang])}${lvl}</span>
           <p class="tv-q small">${esc(q.q[lang])}</p>
-          <p class="tv-head">${esc(head)}</p>
-          ${given.via !== 'dunno' && !given.ok ? `<p class="tv-given">You ${given.via === 'choices' ? 'picked' : 'said'}: <s>${esc(given.text)}</s></p>` : ''}
+          <div data-verdict></div>
           <p class="tv-answer">${esc(right)}</p>
           ${given.counted ? `<p class="fine">Counted as: ${esc(given.counted)}</p>` : ''}
           <p class="tv-note">${esc(q.note[lang])}</p>
@@ -204,10 +214,34 @@ export default {
             <button type="button" class="btn go" data-next>Next</button>
           </div>
         </div>`;
+      const card = body.querySelector('[data-card]');
+      const verdict = body.querySelector('[data-verdict]');
+      // Right = a clear win (Leo, 05/11): gold check, gold answer, a small pop. Wrong = a story, never a red X.
+      function drawVerdict(ok, fixed) {
+        card.classList.toggle('ok', ok);
+        if (ok) {
+          const how = given.via === 'choices' ? 'from the choices' : fixed ? 'counted as right' : 'from memory';
+          const sureLine = sure === 'sure' && given.via === 'typed' && !fixed ? '<p class="tv-sub">You were sure, and you were right.</p>' : '';
+          verdict.innerHTML = `
+            <p class="tv-win"><span class="tv-check" aria-hidden="true">✓</span><span>Got it<small>${how}</small></span></p>
+            ${given.via !== 'dunno' ? `<p class="tv-given">You ${given.via === 'choices' ? 'picked' : 'said'}: <b>${esc(given.text)}</b></p>` : ''}
+            ${sureLine}`;
+          return;
+        }
+        let head;
+        if (given.via === 'dunno') head = 'Here it is.';
+        else if (sure === 'sure') head = 'Ooh, a surprise one. These are the ones that stick.';
+        else head = 'Not this time. Here it is.';
+        verdict.innerHTML = `
+          <p class="tv-head">${esc(head)}</p>
+          ${given.via !== 'dunno' ? `<p class="tv-given">You ${given.via === 'choices' ? 'picked' : 'said'}: <s>${esc(given.text)}</s></p>` : ''}`;
+      }
+      drawVerdict(given.ok, false);
       const fix = body.querySelector('[data-fix]');
       if (fix) fix.addEventListener('click', () => {
         pending.ok = true; pending.fixed = true;
-        fix.replaceWith(Object.assign(document.createElement('span'), { className: 'fine', textContent: 'Okay, counted as right.' }));
+        fix.remove();
+        drawVerdict(true, true);
         body.querySelector('[data-next]').focus({ preventScroll: true });
       });
       body.querySelector('[data-next]').addEventListener('click', next);

@@ -89,10 +89,10 @@ export function shuffle(arr) {
 
 /**
  * The order questions come in: never-seen ones first (shuffled), then the rest (shuffled).
- * `seen` = Set of "pack/id" already answered in past sessions.
+ * `seen` = Set of "pack/id" already answered in past sessions; `levels` = which levels to include.
  */
-export function makeDeck(packs, seen) {
-  const all = packs.flatMap(p => p.questions.map(q => ({ pack: p, q, key: p.id + '/' + q.id })));
+export function makeDeck(packs, seen, levels = [1, 2, 3]) {
+  const all = packs.flatMap(p => p.questions.filter(q => levels.includes(q.level || 2)).map(q => ({ pack: p, q, key: p.id + '/' + q.id })));
   const fresh = shuffle(all.filter(x => !seen.has(x.key)));
   const old = shuffle(all.filter(x => seen.has(x.key)));
   return [...fresh, ...old];

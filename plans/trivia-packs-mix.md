@@ -28,6 +28,12 @@ Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/ty
 - **Minecraft pack, written by us:** ~60 questions (mobs, blocks, crafting, redstone, biomes, versions, history of the game), English + Português.
 - Results are saved as a session like the other trainers (per question: pack, id, from-memory / from-choices / missed, how sure, answer time).
 
+## After stage 1: Leo's first play (05/11) ✅
+- Questions say what kind of answer they want ("In which structure…"), since he answered "the end" to "Where do you find elytra?".
+- A right answer is a clear win: gold check, "Got it · from memory", gold answer, a small pop (still motion-safe); "You were sure, and you were right" when that's true. No points.
+- **Technical Minecraft** is its own pack (redstone, commands, datapacks, how the game runs); he mixes packs when he wants.
+- **Levels**: every question is Easy / Medium / Hard; a Levels filter on the Mix screen (remembered; at least one stays on). Harder questions added: Minecraft 72 (21/29/22), Technical 30 (5/14/11). New packs must give every question a level.
+
 ## Stage 2: Geography + Science (English + Português)
 - `tools/build-trivia.mjs`, run once on this PC, **not in the browser**. It queries Wikidata (CC0) and writes the pack files.
   - Geography: capitals, continents, flags (as text), longest rivers, highest mountains, Brazilian states.
