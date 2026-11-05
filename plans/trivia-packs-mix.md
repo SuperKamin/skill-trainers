@@ -22,10 +22,11 @@ Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/ty
 - **Mix screen:** pack chips to tick (remembered per device), then Start. Packs not built yet show as "coming".
 - **Question screen:**
   - the question, a text box, **Enter** = answer, and a **"show choices"** button with 4 choices (tap or 1–4);
+  - **how sure?** (Leo's yes, 05/11): after he presses Enter (or picks a choice), three buttons **sure / maybe / no idea** (keys 1–3), then the answer shows. **The answer time stops when the answer is given** (Enter or choice), not at the sure-tap. Sure-but-wrong is shown as a twist ("ooh, that's a surprise one"), never as a bigger fail.
   - after the answer: right / not quite, "counted as", the answer, and the one-line story. **Enter / tap** = next.
 - **Pack format:** `trainers/packs/trivia-<id>.js` exporting `{ id, title:{en,pt}, licence, credit, questions:[{ id, q:{en,pt}, a:{en,pt}, aliases:[], wrong:[3], note:{en,pt} }] }`. Each `id` stays stable forever; history depends on it.
 - **Minecraft pack, written by us:** ~60 questions (mobs, blocks, crafting, redstone, biomes, versions, history of the game), English + Português.
-- Results are saved as a session like the other trainers (per question: pack, id, from-memory / from-choices / missed, time).
+- Results are saved as a session like the other trainers (per question: pack, id, from-memory / from-choices / missed, how sure, answer time).
 
 ## Stage 2: Geography + Science (English + Português)
 - `tools/build-trivia.mjs`, run once on this PC, **not in the browser**. It queries Wikidata (CC0) and writes the pack files.
@@ -45,6 +46,5 @@ Read first: `README.md`, `research/trivia.md`, `trainers/index.js`, `trainers/ty
 - This is new data on Leo's Firebase account (per-question memory). Build it in the main conversation after Leo says yes directly.
 
 ## Open, Leo's call (ask when we reach it)
-- Stage 1: add **"how sure?"** (sure / maybe / no idea) before the answer shows? The research says sure-but-wrong sticks best, but it's one more tap.
 - Stage 4: the **monthly outside check** (questions never used in training, to measure real growth): yes or later?
 - More packs after these four: music, history, D&D, Brazil, Godot…
